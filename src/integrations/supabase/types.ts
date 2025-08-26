@@ -14,7 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      future_messages: {
+        Row: {
+          created_at: string
+          delivery_date: string
+          id: string
+          is_delivered: boolean | null
+          message: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_date: string
+          id?: string
+          is_delivered?: boolean | null
+          message: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delivery_date?: string
+          id?: string
+          is_delivered?: boolean | null
+          message?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          age: number | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          timezone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          age?: number | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          age?: number | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_data: {
+        Row: {
+          collected_at: string
+          data_key: string
+          data_type: string
+          data_value: Json
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          collected_at?: string
+          data_key: string
+          data_type: string
+          data_value: Json
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          collected_at?: string
+          data_key?: string
+          data_type?: string
+          data_value?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

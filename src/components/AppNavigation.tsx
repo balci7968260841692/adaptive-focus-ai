@@ -40,6 +40,18 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       description: 'Analytics'
     },
     {
+      id: 'future-messages',
+      label: 'Messages',
+      icon: MessageCircle,
+      description: 'Future Self'
+    },
+    {
+      id: 'data-collection',
+      label: 'Profile',
+      icon: Brain,
+      description: 'Personal Data'
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: Settings,
@@ -70,7 +82,7 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       </div>
 
       {/* Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;

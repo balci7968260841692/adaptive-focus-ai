@@ -1,84 +1,127 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import WellnessDashboard from '@/components/WellnessDashboard';
-import AIOverrideChat from '@/components/AIOverrideChat';
-import AppNavigation from '@/components/AppNavigation';
-import AppLimitsSettings from '@/components/AppLimitsSettings';
-import { Brain, Clock, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import AppNavigation from "../components/AppNavigation";
+import WellnessDashboard from "../components/WellnessDashboard";
+import AppLimitsSettings from "../components/AppLimitsSettings";
+import AIOverrideChat from "../components/AIOverrideChat";
+import FutureMessages from "../components/FutureMessages";
+import UserDataCollection from "../components/UserDataCollection";
+import { useAuth } from "@/hooks/useAuth";
+import { LogOut, User } from "lucide-react";
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [showAIChat, setShowAIChat] = useState(false);
-  
-  // Mock data - in a real app this would come from device APIs
+  const { user, profile, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to auth
+  }
+
+  // Mock data for demonstration
   const mockData = {
-    totalScreenTime: 245, // minutes today
-    dailyLimit: 360, // 6 hours
-    trustScore: 78,
+    totalScreenTime: 245, // minutes
+    dailyLimit: 360, // 6 hours in minutes
+    trustScore: 75,
     apps: [
       {
-        name: 'Instagram',
-        icon: '📸',
-        timeUsed: 85,
-        timeLimit: 60,
-        category: 'Social Media'
+        name: "Social Media",
+        icon: "📱",
+        timeUsed: 135, // minutes
+        timeLimit: 180, // 3 hours
+        category: "Social"
       },
       {
-        name: 'YouTube',
-        icon: '📺',
-        timeUsed: 120,
-        timeLimit: 90,
-        category: 'Entertainment'
+        name: "Work Apps",
+        icon: "💼",
+        timeUsed: 105, // 1h 45m
+        timeLimit: 480, // 8 hours
+        category: "Productivity"
       },
       {
-        name: 'WhatsApp',
-        icon: '💬',
-        timeUsed: 25,
-        timeLimit: 60,
-        category: 'Communication'
+        name: "Entertainment",
+        icon: "🎬",
+        timeUsed: 30,
+        timeLimit: 60, // 1 hour
+        category: "Entertainment"
       },
       {
-        name: 'Chrome',
-        icon: '🌐',
-        timeUsed: 15,
-        timeLimit: 180,
-        category: 'Productivity'
+        name: "Games",
+        icon: "🎮",
+        timeUsed: 150, // 2h 30m
+        timeLimit: 90, // 1h 30m
+        category: "Games"
       }
     ]
   };
 
-  const hasOverLimitApps = mockData.apps.some(app => app.timeUsed >= app.timeLimit);
+  const hasActiveOverride = mockData.apps.some(app => app.timeUsed >= app.timeLimit);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'ai-chat') {
       setShowAIChat(true);
     } else {
       setActiveTab(tab);
+      setShowAIChat(false);
     }
   };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <WellnessDashboard {...mockData} />;
-      case 'limits':
+      case "limits":
         return <AppLimitsSettings />;
-      case 'insights':
+      case "insights":
+        return <WellnessDashboard {...mockData} />;
+      case "future-messages":
+        return <FutureMessages />;
+      case "data-collection":
+        return <UserDataCollection />;
+      case "settings":
         return (
-          <div className="text-center py-12 animate-fade-in">
-            <Brain className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">AI Insights Coming Soon</h3>
-            <p className="text-muted-foreground">Advanced analytics and personalized recommendations</p>
-          </div>
-        );
-      case 'settings':
-        return (
-          <div className="text-center py-12 animate-fade-in">
-            <Clock className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">Settings</h3>
-            <p className="text-muted-foreground">Customize your screen time preferences</p>
-          </div>
+          <Card className="p-6">
+            <h2 className="text-2xl font-bold mb-4">Settings</h2>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <User className="h-5 w-5" />
+                  <div>
+                    <p className="font-medium">{profile?.display_name || user?.email}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  </div>
+                </div>
+                <Button variant="outline" onClick={handleSignOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            </div>
+          </Card>
         );
       default:
         return <WellnessDashboard {...mockData} />;
@@ -86,70 +129,61 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20">
-      <div className="container mx-auto px-4 py-6 max-w-md sm:max-w-2xl">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+      {/* Background decorations */}
+      <div className="fixed inset-0 -z-10">
+        <div className="absolute top-20 left-10 w-72 h-72 primary-gradient rounded-full opacity-10 blur-3xl"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 secondary-gradient rounded-full opacity-10 blur-3xl"></div>
+      </div>
+      
+      <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <header className="mb-6 animate-fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">ScreenWise</h1>
-              <p className="text-sm text-muted-foreground">AI-Enhanced Screen Time Manager</p>
-            </div>
-            
-            {hasOverLimitApps && (
-              <Button
-                variant="ai-chat"
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+          <div>
+            <h1 className="text-3xl font-bold">ScreenWise</h1>
+            <p className="text-muted-foreground">
+              Welcome back, {profile?.display_name || user?.email?.split('@')[0]}
+            </p>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {hasActiveOverride && (
+              <div className="px-3 py-1 bg-warning/10 text-warning border border-warning/20 rounded-full text-sm font-medium">
+                Limits Exceeded
+              </div>
+            )}
+            {hasActiveOverride && (
+              <Button 
+                variant="ai-chat" 
                 size="sm"
                 onClick={() => setShowAIChat(true)}
-                className="animate-gentle-bounce shadow-glow"
+                className="shadow-glow"
               >
-                <AlertCircle className="h-4 w-4 mr-2" />
                 Request Override
               </Button>
             )}
           </div>
-
-          {/* Status Bar */}
-          <div className="flex items-center space-x-2">
-            <Badge 
-              variant={mockData.trustScore >= 70 ? "success" : "warning"}
-              className="text-xs"
-            >
-              Trust Score: {mockData.trustScore}%
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {Math.floor((mockData.dailyLimit - mockData.totalScreenTime) / 60)}h {(mockData.dailyLimit - mockData.totalScreenTime) % 60}m left today
-            </Badge>
-          </div>
-        </header>
-
-        {/* Navigation */}
-        <div className="mb-6">
-          <AppNavigation 
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            hasActiveOverride={hasOverLimitApps}
-            trustScore={mockData.trustScore}
-          />
         </div>
 
+        {/* Navigation */}
+        <AppNavigation 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+          hasActiveOverride={hasActiveOverride}
+          trustScore={mockData.trustScore}
+        />
+
         {/* Main Content */}
-        <main>
+        <div className="space-y-6">
           {renderContent()}
-        </main>
+        </div>
 
         {/* AI Override Chat Modal */}
         <AIOverrideChat 
           isOpen={showAIChat}
           onClose={() => setShowAIChat(false)}
-          currentApp="Instagram" // In real app, this would be the app that triggered the limit
+          currentApp="Games"
         />
-      </div>
-
-      {/* Background Elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute top-1/4 right-1/4 w-64 h-64 primary-gradient rounded-full opacity-5 blur-3xl" />
-        <div className="absolute bottom-1/4 left-1/4 w-48 h-48 wellness-gradient rounded-full opacity-5 blur-3xl" />
       </div>
     </div>
   );
