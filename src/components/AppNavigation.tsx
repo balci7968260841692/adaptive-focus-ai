@@ -52,6 +52,12 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       description: 'Personal Data'
     },
     {
+      id: 'ml-training',
+      label: 'AI Training',
+      icon: Brain,
+      description: 'Train Models'
+    },
+    {
       id: 'settings',
       label: 'Settings',
       icon: Settings,
@@ -82,7 +88,7 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       </div>
 
       {/* Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;

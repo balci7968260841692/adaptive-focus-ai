@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Send, Clock, AlertCircle, CheckCircle, X } from 'lucide-react';
+import useMLModels from '@/hooks/useMLModels';
 
 interface ChatMessage {
   id: string;
@@ -27,6 +28,8 @@ interface AIChatProps {
 }
 
 const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
+  const { evaluateOverrideRequest, isLoading: modelsLoading } = useMLModels();
+  
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -39,7 +42,7 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
   const [inputValue, setInputValue] = useState('');
   const [overrideRequest, setOverrideRequest] = useState<OverrideRequest | null>(null);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -51,8 +54,33 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Simulate AI processing
-    setTimeout(() => {
+    // Use ML model for override evaluation
+    try {
+      const overrideDecision = await evaluateOverrideRequest({
+        reason: inputValue,
+        requestedTime: 30, // Default request
+        currentApp,
+        userHistory: {
+          trustScore: 75, // This would come from user data
+          recentOverrides: 1,
+          timeOfDay: new Date().getHours() > 17 ? 'evening' : 'day'
+        }
+      });
+
+      const aiResponse = generateAIResponseFromML(overrideDecision, inputValue);
+      
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: aiResponse.message,
+        timestamp: new Date()
+      }]);
+
+      if (aiResponse.request) {
+        setOverrideRequest(aiResponse.request);
+      }
+    } catch (error) {
+      // Fallback to template response
       const aiResponse = generateAIResponse(inputValue);
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
@@ -64,7 +92,7 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
       if (aiResponse.request) {
         setOverrideRequest(aiResponse.request);
       }
-    }, 1000);
+    }
 
     setInputValue('');
   };
@@ -130,6 +158,33 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
       content: "I understand. How about taking a 5-minute walk or doing some breathing exercises? I'll be here when you're ready to try a more focused approach.",
       timestamp: new Date()
     }]);
+  };
+
+  // Generate AI response from ML model decision
+  const generateAIResponseFromML = (decision: any, userInput: string) => {
+    if (decision.approved) {
+      return {
+        message: `${decision.reasoning} I can grant you ${decision.timeGranted} minutes. ${decision.conditions ? decision.conditions.join(' ') : ''}`,
+        request: {
+          app: currentApp,
+          requestedTime: decision.timeGranted,
+          reason: userInput,
+          context: `ML Decision - Confidence: ${Math.round(decision.confidence * 100)}%`,
+          status: 'negotiating' as const
+        }
+      };
+    } else {
+      return {
+        message: `${decision.reasoning} How about we try a 5-minute mindful break instead?`,
+        request: {
+          app: currentApp,
+          requestedTime: 5,
+          reason: userInput,
+          context: "ML suggested alternative",
+          status: 'negotiating' as const
+        }
+      };
+    }
   };
 
   if (!isOpen) return null;

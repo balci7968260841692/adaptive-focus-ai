@@ -6,14 +6,18 @@ import AppNavigation from "../components/AppNavigation";
 import WellnessDashboard from "../components/WellnessDashboard";
 import AppLimitsSettings from "../components/AppLimitsSettings";
 import AIOverrideChat from "../components/AIOverrideChat";
+import HabitCoachChat from "../components/HabitCoachChat";
+import MLTrainingInterface from "../components/MLTrainingInterface";
 import FutureMessages from "../components/FutureMessages";
 import UserDataCollection from "../components/UserDataCollection";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Brain, Zap } from "lucide-react";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showAIChat, setShowAIChat] = useState(false);
+  const [showCoachChat, setShowCoachChat] = useState(false);
+  const [showMLTraining, setShowMLTraining] = useState(false);
   const { user, profile, loading, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -102,6 +106,30 @@ const Index = () => {
         return <FutureMessages />;
       case "data-collection":
         return <UserDataCollection />;
+      case "ml-training":
+        return (
+          <Card className="p-6">
+            <div className="text-center space-y-6">
+              <div className="mx-auto w-16 h-16 bg-ai-chat/10 rounded-2xl flex items-center justify-center">
+                <Brain className="h-8 w-8 text-ai-chat" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold mb-2">ML Model Training</h2>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Train your local AI models with custom data for personalized coaching and override decisions.
+                </p>
+              </div>
+              <Button
+                onClick={() => setShowMLTraining(true)}
+                className="primary-gradient"
+                size="lg"
+              >
+                <Brain className="mr-2 h-5 w-5" />
+                Open Training Interface
+              </Button>
+            </div>
+          </Card>
+        );
       case "settings":
         return (
           <Card className="p-6">
@@ -152,12 +180,21 @@ const Index = () => {
                 Limits Exceeded
               </div>
             )}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowCoachChat(true)}
+              className="wellness-gradient text-secondary-foreground"
+            >
+              <Zap className="mr-2 h-4 w-4" />
+              Coach
+            </Button>
             {hasActiveOverride && (
               <Button 
-                variant="ai-chat" 
+                variant="default" 
                 size="sm"
                 onClick={() => setShowAIChat(true)}
-                className="shadow-glow"
+                className="primary-gradient shadow-glow"
               >
                 Request Override
               </Button>
@@ -183,6 +220,24 @@ const Index = () => {
           isOpen={showAIChat}
           onClose={() => setShowAIChat(false)}
           currentApp="Games"
+        />
+
+        {/* Habit Coach Chat Modal */}
+        <HabitCoachChat
+          isOpen={showCoachChat}
+          onClose={() => setShowCoachChat(false)}
+          userContext={{
+            screenTime: mockData.totalScreenTime,
+            trustScore: mockData.trustScore,
+            recentActivity: mockData.apps.map(app => app.name),
+            mood: 'neutral'
+          }}
+        />
+
+        {/* ML Training Interface Modal */}
+        <MLTrainingInterface
+          isOpen={showMLTraining}
+          onClose={() => setShowMLTraining(false)}
         />
       </div>
     </div>
