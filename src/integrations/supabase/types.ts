@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_usage: {
+        Row: {
+          app_name: string
+          app_package: string | null
+          category: string
+          created_at: string
+          id: string
+          time_limit: number
+          time_used: number
+          updated_at: string
+          usage_date: string
+          user_id: string
+        }
+        Insert: {
+          app_name: string
+          app_package?: string | null
+          category: string
+          created_at?: string
+          id?: string
+          time_limit?: number
+          time_used?: number
+          updated_at?: string
+          usage_date?: string
+          user_id: string
+        }
+        Update: {
+          app_name?: string
+          app_package?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          time_limit?: number
+          time_used?: number
+          updated_at?: string
+          usage_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       future_messages: {
         Row: {
           created_at: string
@@ -79,6 +118,39 @@ export type Database = {
           id?: string
           timezone?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      screen_time_summary: {
+        Row: {
+          created_at: string
+          daily_limit: number
+          id: string
+          total_screen_time: number
+          trust_score: number
+          updated_at: string
+          usage_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          total_screen_time?: number
+          trust_score?: number
+          updated_at?: string
+          usage_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          total_screen_time?: number
+          trust_score?: number
+          updated_at?: string
+          usage_date?: string
           user_id?: string
         }
         Relationships: []

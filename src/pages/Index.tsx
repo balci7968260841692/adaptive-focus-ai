@@ -10,7 +10,9 @@ import HabitCoachChat from "../components/HabitCoachChat";
 import MLTrainingInterface from "../components/MLTrainingInterface";
 import FutureMessages from "../components/FutureMessages";
 import UserDataCollection from "../components/UserDataCollection";
+import DeviceTrackingStatus from "../components/DeviceTrackingStatus";
 import { useAuth } from "@/hooks/useAuth";
+import { useDeviceTracking } from "@/hooks/useDeviceTracking";
 import { LogOut, User, Brain, Zap } from "lucide-react";
 
 const Index = () => {
@@ -19,6 +21,7 @@ const Index = () => {
   const [showCoachChat, setShowCoachChat] = useState(false);
   const [showMLTraining, setShowMLTraining] = useState(false);
   const { user, profile, loading, signOut } = useAuth();
+  const { screenTimeData } = useDeviceTracking();
   const navigate = useNavigate();
 
   // Redirect to auth if not logged in
@@ -48,8 +51,8 @@ const Index = () => {
     return null; // Will redirect to auth
   }
 
-  // Mock data for demonstration
-  const mockData = {
+  // Use real tracking data, fallback to demo data if no real data available
+  const displayData = screenTimeData.apps.length > 0 ? screenTimeData : {
     totalScreenTime: 245, // minutes
     dailyLimit: 360, // 6 hours in minutes
     trustScore: 75,
@@ -85,7 +88,7 @@ const Index = () => {
     ]
   };
 
-  const hasActiveOverride = mockData.apps.some(app => app.timeUsed >= app.timeLimit);
+  const hasActiveOverride = displayData.apps.some(app => app.timeUsed >= app.timeLimit);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'ai-chat') {
@@ -101,7 +104,7 @@ const Index = () => {
       case "limits":
         return <AppLimitsSettings />;
       case "insights":
-        return <WellnessDashboard {...mockData} />;
+        return <WellnessDashboard {...displayData} />;
       case "future-messages":
         return <FutureMessages />;
       case "data-collection":
@@ -152,7 +155,7 @@ const Index = () => {
           </Card>
         );
       default:
-        return <WellnessDashboard {...mockData} />;
+        return <WellnessDashboard {...displayData} />;
     }
   };
 
@@ -203,15 +206,16 @@ const Index = () => {
         </div>
 
         {/* Navigation */}
-        <AppNavigation 
-          activeTab={activeTab} 
-          onTabChange={handleTabChange}
-          hasActiveOverride={hasActiveOverride}
-          trustScore={mockData.trustScore}
-        />
+            <AppNavigation 
+              activeTab={activeTab} 
+              onTabChange={handleTabChange}
+              hasActiveOverride={hasActiveOverride}
+              trustScore={displayData.trustScore}
+            />
 
         {/* Main Content */}
         <div className="space-y-6">
+          <DeviceTrackingStatus />
           {renderContent()}
         </div>
 
@@ -227,9 +231,9 @@ const Index = () => {
           isOpen={showCoachChat}
           onClose={() => setShowCoachChat(false)}
           userContext={{
-            screenTime: mockData.totalScreenTime,
-            trustScore: mockData.trustScore,
-            recentActivity: mockData.apps.map(app => app.name),
+            screenTime: displayData.totalScreenTime,
+            trustScore: displayData.trustScore,
+            recentActivity: displayData.apps.map(app => app.name),
             mood: 'neutral'
           }}
         />
