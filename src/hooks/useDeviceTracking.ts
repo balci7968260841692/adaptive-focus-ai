@@ -3,6 +3,7 @@ import { App } from '@capacitor/app';
 import { Device } from '@capacitor/device';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { SystemAppTracker, type SystemApp } from '@/services/systemAppTracker';
 
 interface AppUsageData {
   name: string;
@@ -30,6 +31,7 @@ export const useDeviceTracking = () => {
   });
   const [isTracking, setIsTracking] = useState(false);
   const [lastActiveTime, setLastActiveTime] = useState(Date.now());
+  const [systemAppTracker] = useState(new SystemAppTracker());
 
   // Track app state changes
   useEffect(() => {
@@ -97,14 +99,50 @@ export const useDeviceTracking = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      // Load app usage data
-      const { data: appUsageData, error: appError } = await supabase
+      // Load existing app usage data from database
+      const { data: dbAppUsageData, error: appError } = await supabase
         .from('app_usage')
         .select('*')
         .eq('user_id', user.id)
         .eq('usage_date', today);
 
       if (appError) throw appError;
+
+      // Get system-wide app usage
+      const systemApps = await systemAppTracker.getInstalledApps();
+      
+      // Merge database data with system apps
+      const mergedApps: AppUsageData[] = [];
+      
+      // Add system apps with their current usage
+      for (const systemApp of systemApps) {
+        const dbApp = dbAppUsageData?.find(db => db.app_package === systemApp.packageName);
+        
+        mergedApps.push({
+          name: systemApp.name,
+          icon: systemApp.icon,
+          timeUsed: systemApp.timeUsed,
+          timeLimit: dbApp?.time_limit || systemApp.timeLimit,
+          category: systemApp.category,
+          packageName: systemApp.packageName
+        });
+
+        // Update database with current usage
+        await updateAppUsageInDb(systemApp.name, systemApp.packageName, systemApp.category, systemApp.timeUsed);
+      }
+
+      // Add ScreenWise app
+      const screenWiseApp = dbAppUsageData?.find(db => db.app_name === 'ScreenWise');
+      if (screenWiseApp) {
+        mergedApps.push({
+          name: screenWiseApp.app_name,
+          icon: getCategoryIcon(screenWiseApp.category),
+          timeUsed: screenWiseApp.time_used,
+          timeLimit: screenWiseApp.time_limit,
+          category: screenWiseApp.category,
+          packageName: screenWiseApp.app_package || undefined
+        });
+      }
 
       // Load screen time summary
       const { data: summaryData, error: summaryError } = await supabase
@@ -118,34 +156,73 @@ export const useDeviceTracking = () => {
         throw summaryError;
       }
 
-      // Transform data
-      const apps: AppUsageData[] = appUsageData?.map(app => ({
-        name: app.app_name,
-        icon: getCategoryIcon(app.category),
-        timeUsed: app.time_used,
-        timeLimit: app.time_limit,
-        category: app.category,
-        packageName: app.app_package || undefined
-      })) || [];
-
-      const totalScreenTime = apps.reduce((sum, app) => sum + app.timeUsed, 0);
+      const totalScreenTime = mergedApps.reduce((sum, app) => sum + app.timeUsed, 0);
       
       setScreenTimeData({
         totalScreenTime,
         dailyLimit: summaryData?.daily_limit || 360,
-        trustScore: summaryData?.trust_score || calculateTrustScore(apps, summaryData?.daily_limit || 360),
-        apps
+        trustScore: summaryData?.trust_score || calculateTrustScore(mergedApps, summaryData?.daily_limit || 360),
+        apps: mergedApps
       });
 
     } catch (error) {
       console.error('Error loading today\'s data:', error);
-      // Use default/demo data if real data fails to load
-      setScreenTimeData({
-        totalScreenTime: 0,
-        dailyLimit: 360,
-        trustScore: 100,
-        apps: []
-      });
+      // Fallback to system apps only
+      try {
+        const systemApps = await systemAppTracker.getInstalledApps();
+        const fallbackApps: AppUsageData[] = systemApps.map(app => ({
+          name: app.name,
+          icon: app.icon,
+          timeUsed: app.timeUsed,
+          timeLimit: app.timeLimit,
+          category: app.category,
+          packageName: app.packageName
+        }));
+        
+        const totalScreenTime = fallbackApps.reduce((sum, app) => sum + app.timeUsed, 0);
+        
+        setScreenTimeData({
+          totalScreenTime,
+          dailyLimit: 360,
+          trustScore: calculateTrustScore(fallbackApps, 360),
+          apps: fallbackApps
+        });
+      } catch {
+        setScreenTimeData({
+          totalScreenTime: 0,
+          dailyLimit: 360,
+          trustScore: 100,
+          apps: []
+        });
+      }
+    }
+  };
+
+  const updateAppUsageInDb = async (appName: string, packageName: string, category: string, totalMinutes: number) => {
+    if (!user) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Upsert app usage with total time (not additive)
+      const { error: upsertError } = await supabase
+        .from('app_usage')
+        .upsert({
+          user_id: user.id,
+          app_name: appName,
+          app_package: packageName,
+          category,
+          time_used: totalMinutes,
+          usage_date: today
+        }, {
+          onConflict: 'user_id,app_name,usage_date',
+          ignoreDuplicates: false
+        });
+
+      if (upsertError) throw upsertError;
+      
+    } catch (error) {
+      console.error('Error updating app usage in db:', error);
     }
   };
 
@@ -156,14 +233,25 @@ export const useDeviceTracking = () => {
       const today = new Date().toISOString().split('T')[0];
       const category = appName === 'ScreenWise' ? 'Productivity' : 'Other';
 
-      // Upsert app usage
+      // Get current usage
+      const { data: currentUsage } = await supabase
+        .from('app_usage')
+        .select('time_used')
+        .eq('user_id', user.id)
+        .eq('app_name', appName)
+        .eq('usage_date', today)
+        .single();
+
+      const newTotal = (currentUsage?.time_used || 0) + additionalMinutes;
+
+      // Upsert app usage with incremented time
       const { error: upsertError } = await supabase
         .from('app_usage')
         .upsert({
           user_id: user.id,
           app_name: appName,
           category,
-          time_used: additionalMinutes,
+          time_used: newTotal,
           usage_date: today
         }, {
           onConflict: 'user_id,app_name,usage_date',
