@@ -52,18 +52,23 @@ const useMLModels = () => {
   const initializeModels = useCallback(async () => {
     setIsLoading(true);
     try {
-      // For now, use lightweight models as templates
-      // These will be replaced with your trained models
+      // Use web-compatible models with proper device detection
       const coachModel = await pipeline(
         'text-generation',
         'microsoft/DialoGPT-small',
-        { device: 'cpu' }
+        { 
+          device: 'wasm',
+          dtype: 'fp32'
+        }
       );
 
       const overrideModel = await pipeline(
         'text-classification',
         'cardiffnlp/twitter-roberta-base-sentiment-latest',
-        { device: 'cpu' }
+        { 
+          device: 'wasm',
+          dtype: 'fp32'
+        }
       );
 
       setModels({
