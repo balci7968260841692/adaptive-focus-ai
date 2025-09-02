@@ -43,6 +43,14 @@ export const useDeviceTracking = () => {
         const deviceInfo = await Device.getInfo();
         console.log('Device info:', deviceInfo);
 
+        // For Android, check and request usage stats permission
+        if (deviceInfo.platform === 'android') {
+          const hasPermission = await systemAppTracker.requestUsagePermissionIfNeeded();
+          if (!hasPermission) {
+            console.log('Usage stats permission required for accurate tracking');
+          }
+        }
+
         // Listen to app state changes
         App.addListener('appStateChange', ({ isActive }) => {
           const now = Date.now();
@@ -50,6 +58,8 @@ export const useDeviceTracking = () => {
           if (isActive) {
             setLastActiveTime(now);
             setIsTracking(true);
+            // Reload data when app becomes active to get fresh usage stats
+            loadTodaysData();
           } else {
             // Calculate session time when app goes to background
             if (isTracking) {
@@ -301,13 +311,38 @@ export const useDeviceTracking = () => {
     
     let score = 100;
     
-    // Reduce score based on total usage vs daily limit
+    // Reduce score based on total usage vs daily limit (0-40 point penalty)
     if (totalUsage > dailyLimit) {
-      score -= Math.min(30, (totalUsage - dailyLimit) / dailyLimit * 50);
+      const overageRatio = (totalUsage - dailyLimit) / dailyLimit;
+      score -= Math.min(40, overageRatio * 30);
     }
     
-    // Reduce score for each app over its limit
-    score -= overLimitApps * 10;
+    // Reduce score for each app over its limit (0-30 point penalty)
+    const maxOverLimitPenalty = 30;
+    const overLimitPenalty = Math.min(maxOverLimitPenalty, overLimitApps * 5);
+    score -= overLimitPenalty;
+    
+    // Bonus for staying under limits (0-10 point bonus)
+    if (totalUsage <= dailyLimit * 0.8 && overLimitApps === 0) {
+      score += 10;
+    }
+    
+    // Category-based penalties for excessive social/entertainment usage
+    const socialApps = apps.filter(app => app.category === 'Social');
+    const entertainmentApps = apps.filter(app => app.category === 'Entertainment');
+    
+    const socialUsage = socialApps.reduce((sum, app) => sum + app.timeUsed, 0);
+    const entertainmentUsage = entertainmentApps.reduce((sum, app) => sum + app.timeUsed, 0);
+    
+    // Penalize excessive social media usage (>2 hours)
+    if (socialUsage > 120) {
+      score -= Math.min(15, (socialUsage - 120) / 60 * 5);
+    }
+    
+    // Penalize excessive entertainment usage (>3 hours)
+    if (entertainmentUsage > 180) {
+      score -= Math.min(15, (entertainmentUsage - 180) / 60 * 3);
+    }
     
     return Math.max(0, Math.floor(score));
   };

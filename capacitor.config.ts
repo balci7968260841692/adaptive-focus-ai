@@ -26,7 +26,17 @@ const config: CapacitorConfig = {
       resize: "body",
       style: "DARK",
       resizeOnFullScreen: true
+    },
+    UsageTracker: {
+      requestPermissions: true
     }
+  },
+  android: {
+    allowMixedContent: true,
+    permissions: [
+      "android.permission.PACKAGE_USAGE_STATS",
+      "android.permission.QUERY_ALL_PACKAGES"
+    ]
   }
 };
 

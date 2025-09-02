@@ -1,5 +1,6 @@
 import { Device } from '@capacitor/device';
 import { AppLauncher } from '@capacitor/app-launcher';
+import UsageTracker from '@/plugins/UsageTracker';
 
 export interface SystemApp {
   name: string;
@@ -91,23 +92,71 @@ export class SystemAppTracker {
     try {
       const deviceInfo = await Device.getInfo();
       
-      // In a real implementation, you would use platform-specific APIs here:
-      // - Android: UsageStatsManager API
-      // - iOS: Screen Time API (requires special entitlements)
-      
-      if (deviceInfo.platform === 'web') {
-        // Return mock data for web/development
-        return this.getMockAppsWithDynamicUsage();
+      if (deviceInfo.platform === 'android') {
+        // Check for usage stats permission
+        const hasPermission = await UsageTracker.hasUsageStatsPermission();
+        
+        if (!hasPermission.granted) {
+          console.log('Usage stats permission not granted, requesting...');
+          await UsageTracker.requestUsageStatsPermission();
+          // Return mock data until permission is granted
+          return this.getMockAppsWithDynamicUsage();
+        }
+
+        // Get real usage stats from Android
+        const endTime = Date.now();
+        const startTime = endTime - (24 * 60 * 60 * 1000); // Last 24 hours
+
+        const result = await UsageTracker.getUsageStats({ startTime, endTime });
+        
+        if (result.success && result.apps.length > 0) {
+          return result.apps.map(app => ({
+            name: app.appName,
+            packageName: app.packageName,
+            category: app.category || 'Other',
+            icon: this.getIconForCategory(app.category || 'Other'),
+            timeUsed: app.totalTimeInForeground,
+            timeLimit: this.getDefaultLimitForCategory(app.category || 'Other'),
+            lastUsed: new Date(app.lastTimeUsed)
+          }));
+        }
       }
       
-      // For mobile platforms, you would implement real device API calls here
-      // For now, return enhanced mock data
+      // Fallback to mock data for web/iOS or if Android fails
       return this.getMockAppsWithDynamicUsage();
       
     } catch (error) {
       console.error('Error getting installed apps:', error);
       return this.getMockAppsWithDynamicUsage();
     }
+  }
+
+  private getIconForCategory(category: string): string {
+    const iconMap: { [key: string]: string } = {
+      'Social': '📱',
+      'Productivity': '💼',
+      'Entertainment': '🎬',
+      'Games': '🎮',
+      'Education': '📚',
+      'Health': '❤️',
+      'Finance': '💰',
+      'Other': '📱'
+    };
+    return iconMap[category] || '📱';
+  }
+
+  private getDefaultLimitForCategory(category: string): number {
+    const limitMap: { [key: string]: number } = {
+      'Social': 60,        // 1 hour
+      'Entertainment': 90,  // 1.5 hours
+      'Games': 60,         // 1 hour
+      'Productivity': 180, // 3 hours
+      'Education': 120,    // 2 hours
+      'Health': 30,        // 30 minutes
+      'Finance': 30,       // 30 minutes
+      'Other': 60          // 1 hour
+    };
+    return limitMap[category] || 60;
   }
 
   private getMockAppsWithDynamicUsage(): SystemApp[] {
@@ -142,9 +191,51 @@ export class SystemAppTracker {
   }
 
   async getAppUsageStats(packageName: string): Promise<number> {
-    // In a real implementation, this would query the system for actual usage stats
-    const app = this.mockApps.find(a => a.packageName === packageName);
-    return app ? this.simulateRealisticUsage(app) : 0;
+    try {
+      const deviceInfo = await Device.getInfo();
+      
+      if (deviceInfo.platform === 'android') {
+        const endTime = Date.now();
+        const startTime = endTime - (24 * 60 * 60 * 1000); // Last 24 hours
+        
+        const result = await UsageTracker.getUsageStats({ startTime, endTime });
+        
+        if (result.success) {
+          const app = result.apps.find(a => a.packageName === packageName);
+          return app ? app.totalTimeInForeground : 0;
+        }
+      }
+      
+      // Fallback to mock data
+      const app = this.mockApps.find(a => a.packageName === packageName);
+      return app ? this.simulateRealisticUsage(app) : 0;
+    } catch (error) {
+      console.error('Error getting app usage stats:', error);
+      return 0;
+    }
+  }
+
+  async requestUsagePermissionIfNeeded(): Promise<boolean> {
+    try {
+      const deviceInfo = await Device.getInfo();
+      
+      if (deviceInfo.platform === 'android') {
+        const hasPermission = await UsageTracker.hasUsageStatsPermission();
+        
+        if (!hasPermission.granted) {
+          console.log('Requesting usage stats permission...');
+          await UsageTracker.requestUsageStatsPermission();
+          return false;
+        }
+        
+        return true;
+      }
+      
+      return true; // Always return true for non-Android platforms
+    } catch (error) {
+      console.error('Error checking usage permission:', error);
+      return false;
+    }
   }
 
   async canOpenApp(packageName: string): Promise<boolean> {
