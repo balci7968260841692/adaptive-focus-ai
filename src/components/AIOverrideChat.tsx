@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Send, Clock, AlertCircle, CheckCircle, X } from 'lucide-react';
-import useMLModels from '@/hooks/useMLModels';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChatMessage {
   id: string;
@@ -28,7 +28,15 @@ interface AIChatProps {
 }
 
 const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
-  const { evaluateOverrideRequest, isLoading: modelsLoading } = useMLModels();
+  // Get training data from localStorage for context
+  const getTrainingData = () => {
+    try {
+      const data = localStorage.getItem('override_training_data');
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  };
   
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -54,18 +62,34 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Use ML model for override evaluation
+    // Use Gemini AI for override evaluation
     try {
-      const overrideDecision = await evaluateOverrideRequest({
-        reason: inputValue,
-        requestedTime: 30, // Default request
-        currentApp,
-        userHistory: {
-          trustScore: 75, // This would come from user data
-          recentOverrides: 1,
-          timeOfDay: new Date().getHours() > 17 ? 'evening' : 'day'
+      const { data: overrideDecision, error } = await supabase.functions.invoke('override-ai', {
+        body: {
+          request: {
+            app: currentApp,
+            requestedTime: 30,
+            reason: inputValue,
+            context: {
+              trustScore: 75, // This would come from user data
+              recentOverrides: 1,
+              timeOfDay: new Date().getHours() > 17 ? 'evening' : 'day'
+            }
+          },
+          trainingData: getTrainingData()
         }
       });
+
+      if (error) throw error;
+
+      // Add training data
+      const trainingData = getTrainingData();
+      trainingData.push({
+        input: inputValue,
+        output: JSON.stringify(overrideDecision),
+        context: { app: currentApp }
+      });
+      localStorage.setItem('override_training_data', JSON.stringify(trainingData));
 
       const aiResponse = generateAIResponseFromML(overrideDecision, inputValue);
       
@@ -160,16 +184,15 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
     }]);
   };
 
-  // Generate AI response from ML model decision
   const generateAIResponseFromML = (decision: any, userInput: string) => {
     if (decision.approved) {
       return {
-        message: `${decision.reasoning} I can grant you ${decision.timeGranted} minutes. ${decision.conditions ? decision.conditions.join(' ') : ''}`,
+        message: `${decision.reasoning} I can grant you ${decision.maxTime} minutes. ${decision.conditions ? decision.conditions.join(' ') : ''}`,
         request: {
           app: currentApp,
-          requestedTime: decision.timeGranted,
+          requestedTime: decision.maxTime,
           reason: userInput,
-          context: `ML Decision - Confidence: ${Math.round(decision.confidence * 100)}%`,
+          context: `AI Decision - Confidence: ${Math.round(decision.confidence * 100)}%`,
           status: 'negotiating' as const
         }
       };
@@ -180,7 +203,7 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
           app: currentApp,
           requestedTime: 5,
           reason: userInput,
-          context: "ML suggested alternative",
+          context: "AI suggested alternative",
           status: 'negotiating' as const
         }
       };

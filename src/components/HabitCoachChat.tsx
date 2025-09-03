@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Heart, MessageCircle, Send, TrendingUp, X, Sparkles } from 'lucide-react';
-import useMLModels from '@/hooks/useMLModels';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CoachMessage {
   id: string;
@@ -28,7 +28,15 @@ interface HabitCoachProps {
 }
 
 const HabitCoachChat = ({ isOpen, onClose, userContext }: HabitCoachProps) => {
-  const { generateCoachResponse, isLoading, addTrainingData } = useMLModels();
+  // Get training data from localStorage for context
+  const getTrainingData = () => {
+    try {
+      const data = localStorage.getItem('coach_training_data');
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  };
   
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -61,29 +69,41 @@ const HabitCoachChat = ({ isOpen, onClose, userContext }: HabitCoachProps) => {
     setIsTyping(true);
     
     try {
-      const coachResponse = await generateCoachResponse(inputValue, {
-        screenTime: userContext.screenTime,
-        trustScore: userContext.trustScore,
-        recentActivity: userContext.recentActivity,
-        timeOfDay: new Date().getHours() > 17 ? 'evening' : 
-                   new Date().getHours() > 12 ? 'afternoon' : 'morning'
+      // Call the coach-ai edge function
+      const { data: coachResponse, error } = await supabase.functions.invoke('coach-ai', {
+        body: {
+          userInput: inputValue,
+          context: {
+            screenTime: userContext.screenTime,
+            trustScore: userContext.trustScore,
+            recentActivity: userContext.recentActivity,
+            timeOfDay: new Date().getHours() > 17 ? 'evening' : 
+                       new Date().getHours() > 12 ? 'afternoon' : 'morning'
+          },
+          trainingData: getTrainingData()
+        }
       });
+
+      if (error) throw error;
 
       const coachMessage: CoachMessage = {
         id: (Date.now() + 1).toString(),
         type: 'coach',
-        content: coachResponse.message,
+        content: coachResponse.content,
         timestamp: new Date(),
-        intervention: coachResponse.intervention,
+        intervention: coachResponse.interventionType === 'supportive' ? 'supportive' : 
+                     coachResponse.interventionType === 'stress-relief' ? 'gentle' : 'firm',
         suggestion: coachResponse.suggestion
       };
 
       // Add training data for future improvement
-      addTrainingData('coach', {
+      const trainingData = getTrainingData();
+      trainingData.push({
         input: `Context: ${JSON.stringify(userContext)}\nUser: ${inputValue}`,
-        output: coachResponse.message,
-        context: { intervention: coachResponse.intervention, confidence: coachResponse.confidence }
+        output: coachResponse.content,
+        context: { intervention: coachResponse.interventionType, confidence: coachResponse.confidence }
       });
+      localStorage.setItem('coach_training_data', JSON.stringify(trainingData));
 
       setMessages(prev => [...prev, coachMessage]);
     } catch (error) {
@@ -235,11 +255,11 @@ const HabitCoachChat = ({ isOpen, onClose, userContext }: HabitCoachProps) => {
               placeholder="How are you feeling? What's on your mind?"
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               className="flex-1"
-              disabled={isLoading}
+              disabled={false}
             />
             <Button 
               onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={!inputValue.trim() || isTyping}
               variant="default"
               className="wellness-gradient"
             >
@@ -248,8 +268,8 @@ const HabitCoachChat = ({ isOpen, onClose, userContext }: HabitCoachProps) => {
           </div>
           
           <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
-            <span>Powered by local AI</span>
-            {isLoading && (
+            <span>Powered by Gemini AI</span>
+            {isTyping && (
               <div className="flex items-center space-x-1">
                 <div className="w-1 h-1 bg-primary rounded-full animate-pulse"></div>
                 <span>AI thinking...</span>
