@@ -31,6 +31,30 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
+  // Check if coach should show up (once a week) - moved before early returns
+  const shouldShowWeeklyCoach = () => {
+    const lastCoachVisit = localStorage.getItem('lastCoachVisit');
+    const now = new Date().getTime();
+    const oneWeek = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
+    
+    if (!lastCoachVisit || (now - parseInt(lastCoachVisit)) > oneWeek) {
+      return true;
+    }
+    return false;
+  };
+
+  // Auto-show coach if it's time for weekly check-in - moved before early returns
+  useEffect(() => {
+    if (shouldShowWeeklyCoach() && !showCoachChat && user) {
+      const timer = setTimeout(() => {
+        setShowCoachChat(true);
+        localStorage.setItem('lastCoachVisit', new Date().getTime().toString());
+      }, 3000); // Show after 3 seconds of page load
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, showCoachChat]);
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
@@ -90,30 +114,6 @@ const Index = () => {
 
   const hasActiveOverride = displayData?.apps?.some(app => app.timeUsed >= app.timeLimit) || false;
   const currentOverrideApp = displayData?.apps?.find(app => app.timeUsed >= app.timeLimit)?.name || "Unknown App";
-
-  // Check if coach should show up (once a week)
-  const shouldShowWeeklyCoach = () => {
-    const lastCoachVisit = localStorage.getItem('lastCoachVisit');
-    const now = new Date().getTime();
-    const oneWeek = 7 * 24 * 60 * 60 * 1000; // 1 week in milliseconds
-    
-    if (!lastCoachVisit || (now - parseInt(lastCoachVisit)) > oneWeek) {
-      return true;
-    }
-    return false;
-  };
-
-  // Auto-show coach if it's time for weekly check-in
-  useEffect(() => {
-    if (shouldShowWeeklyCoach() && !showCoachChat && user) {
-      const timer = setTimeout(() => {
-        setShowCoachChat(true);
-        localStorage.setItem('lastCoachVisit', new Date().getTime().toString());
-      }, 3000); // Show after 3 seconds of page load
-      
-      return () => clearTimeout(timer);
-    }
-  }, [user, showCoachChat]);
 
   const handleTabChange = (tab: string) => {
     if (tab === 'ai-chat') {
