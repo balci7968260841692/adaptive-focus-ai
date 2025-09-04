@@ -52,7 +52,7 @@ const Index = () => {
   }
 
   // Use real tracking data, fallback to demo data if no real data available
-  const displayData = screenTimeData.apps.length > 0 ? screenTimeData : {
+  const displayData = (screenTimeData?.apps?.length > 0) ? screenTimeData : {
     totalScreenTime: 245, // minutes
     dailyLimit: 360, // 6 hours in minutes
     trustScore: 75,
@@ -88,8 +88,8 @@ const Index = () => {
     ]
   };
 
-  const hasActiveOverride = displayData.apps.some(app => app.timeUsed >= app.timeLimit);
-  const currentOverrideApp = displayData.apps.find(app => app.timeUsed >= app.timeLimit)?.name || "Unknown App";
+  const hasActiveOverride = displayData?.apps?.some(app => app.timeUsed >= app.timeLimit) || false;
+  const currentOverrideApp = displayData?.apps?.find(app => app.timeUsed >= app.timeLimit)?.name || "Unknown App";
 
   // Check if coach should show up (once a week)
   const shouldShowWeeklyCoach = () => {
@@ -129,7 +129,12 @@ const Index = () => {
       case "limits":
         return <AppLimitsSettings />;
       case "insights":
-        return <WellnessDashboard {...displayData} />;
+        return <WellnessDashboard 
+          totalScreenTime={displayData?.totalScreenTime || 0}
+          dailyLimit={displayData?.dailyLimit || 360}
+          trustScore={displayData?.trustScore || 0}
+          apps={displayData?.apps || []}
+        />;
       case "future-messages":
         return <FutureMessages />;
       case "data-collection":
@@ -180,7 +185,12 @@ const Index = () => {
           </Card>
         );
       default:
-        return <WellnessDashboard {...displayData} />;
+        return <WellnessDashboard 
+          totalScreenTime={displayData?.totalScreenTime || 0}
+          dailyLimit={displayData?.dailyLimit || 360}
+          trustScore={displayData?.trustScore || 0}
+          apps={displayData?.apps || []}
+        />;
     }
   };
 
@@ -235,7 +245,7 @@ const Index = () => {
               activeTab={activeTab} 
               onTabChange={handleTabChange}
               hasActiveOverride={hasActiveOverride}
-              trustScore={displayData.trustScore}
+              trustScore={displayData?.trustScore || 0}
             />
 
         {/* Main Content */}
@@ -256,9 +266,9 @@ const Index = () => {
           isOpen={showCoachChat}
           onClose={() => setShowCoachChat(false)}
           userContext={{
-            screenTime: displayData.totalScreenTime,
-            trustScore: displayData.trustScore,
-            recentActivity: displayData.apps.map(app => app.name),
+            screenTime: displayData?.totalScreenTime || 0,
+            trustScore: displayData?.trustScore || 0,
+            recentActivity: displayData?.apps?.map(app => app.name) || [],
             mood: 'neutral'
           }}
         />
