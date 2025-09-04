@@ -167,8 +167,8 @@ const Index = () => {
                 <div className="flex items-center space-x-3">
                   <User className="h-5 w-5" />
                   <div>
-                    <p className="font-medium">{profile?.display_name || user?.email}</p>
-                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+            <p className="font-medium">{profile?.display_name || user?.email || 'User'}</p>
+            <p className="text-sm text-muted-foreground">{user?.email || 'Loading...'}</p>
                   </div>
                 </div>
                 <Button variant="outline" onClick={handleSignOut}>
@@ -198,7 +198,7 @@ const Index = () => {
           <div>
             <h1 className="text-3xl font-bold">ScreenWise</h1>
             <p className="text-muted-foreground">
-              Welcome back, {profile?.display_name || user?.email?.split('@')[0]}
+              Welcome back, {profile?.display_name || user?.email?.split('@')[0] || 'User'}
             </p>
           </div>
           

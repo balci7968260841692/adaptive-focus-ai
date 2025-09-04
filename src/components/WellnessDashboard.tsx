@@ -94,12 +94,12 @@ const WellnessDashboard = ({ totalScreenTime, dailyLimit, trustScore, apps }: Da
             App Usage Today
           </h3>
           <Badge variant="outline" className="text-xs">
-            {apps.length} apps tracked
+            {apps?.length || 0} apps tracked
           </Badge>
         </div>
         
         <div className="space-y-4">
-          {apps.map((app, index) => {
+          {apps?.map((app, index) => {
             const percentage = getUsagePercentage(app.timeUsed, app.timeLimit);
             const isOverLimit = app.timeUsed >= app.timeLimit;
             
@@ -129,7 +129,7 @@ const WellnessDashboard = ({ totalScreenTime, dailyLimit, trustScore, apps }: Da
                 />
               </div>
             );
-          })}
+          }) || []}
         </div>
       </Card>
 
