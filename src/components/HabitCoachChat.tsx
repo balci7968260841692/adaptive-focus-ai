@@ -123,16 +123,66 @@ const HabitCoachChat = ({ isOpen, onClose, userContext }: HabitCoachProps) => {
   };
 
   const generateWelcomeMessage = (context: typeof userContext): string => {
-    const { screenTime, trustScore } = context;
+    const { screenTime, trustScore, recentActivity } = context;
     const timeHours = Math.floor(screenTime / 60);
+    const isWeeklyCheckIn = shouldShowWeeklyMessage();
+    
+    // Dynamic personality based on patterns
+    const personalityType = getPersonalityType(trustScore, recentActivity);
+    const weeklyTrend = getWeeklyTrend(trustScore);
+    
+    if (isWeeklyCheckIn) {
+      const trendMessage = weeklyTrend === 'improving' ? 
+        "I've noticed some positive changes in your habits this week! 📈" :
+        weeklyTrend === 'declining' ? 
+        "I've been keeping an eye on your patterns this week. Let's work together to get back on track. 💪" :
+        "Another week of digital wellness! Let's see how you're feeling about your screen time habits. 🤔";
+        
+      return `${trendMessage} It's time for our weekly check-in! You've used ${timeHours > 0 ? `${timeHours}h ` : ''}${screenTime % 60}m today. ${getPersonalityGreeting(personalityType)}`;
+    }
     
     if (trustScore > 80) {
-      return `Hey there! 🌟 You're doing amazing with your screen time goals. You've used ${timeHours > 0 ? `${timeHours}h ` : ''}${screenTime % 60}m today. How are you feeling?`;
+      return `${getPersonalityGreeting(personalityType)} You're absolutely crushing your screen time goals! You've used ${timeHours > 0 ? `${timeHours}h ` : ''}${screenTime % 60}m today. What's been helping you stay so disciplined?`;
     } else if (trustScore > 60) {
-      return `Hi! I can see you're working on building better screen time habits. You're making progress! How has your day been going?`;
+      return `${getPersonalityGreeting(personalityType)} I can see you're working hard on building better habits. You're making real progress! How has your relationship with technology been feeling lately?`;
     } else {
-      return `Hello! I'm here to support you on your wellness journey. It looks like you might be struggling with screen time today - that's completely normal. Want to talk about it?`;
+      return `${getPersonalityGreeting(personalityType)} I'm here to support you through whatever you're experiencing with screen time. It looks challenging today - that's completely human. Want to share what's on your mind?`;
     }
+  };
+  
+  const shouldShowWeeklyMessage = (): boolean => {
+    const lastCoachVisit = localStorage.getItem('lastCoachVisit');
+    const now = new Date().getTime();
+    const oneWeek = 7 * 24 * 60 * 60 * 1000;
+    
+    return !lastCoachVisit || (now - parseInt(lastCoachVisit)) > oneWeek;
+  };
+  
+  const getPersonalityType = (trustScore: number, recentActivity: string[]): string => {
+    if (trustScore > 75 && recentActivity.includes('Work Apps')) return 'motivated';
+    if (trustScore < 50 && recentActivity.includes('Games')) return 'gentle';
+    if (trustScore > 60) return 'encouraging';
+    return 'supportive';
+  };
+  
+  const getWeeklyTrend = (currentScore: number): 'improving' | 'declining' | 'stable' => {
+    const lastWeekScore = parseInt(localStorage.getItem('lastWeekTrustScore') || '0');
+    localStorage.setItem('lastWeekTrustScore', currentScore.toString());
+    
+    if (lastWeekScore === 0) return 'stable';
+    if (currentScore > lastWeekScore + 5) return 'improving';
+    if (currentScore < lastWeekScore - 5) return 'declining';
+    return 'stable';
+  };
+  
+  const getPersonalityGreeting = (type: string): string => {
+    const greetings = {
+      motivated: "Hey champion! 🚀",
+      gentle: "Hi there, friend. 🌱",
+      encouraging: "Hello! 💪",
+      supportive: "Hey, I'm here for you. 🤗"
+    };
+    return greetings[type as keyof typeof greetings] || "Hi there! 👋";
   };
 
   const getInterventionColor = (intervention?: string) => {

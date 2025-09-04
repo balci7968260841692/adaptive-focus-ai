@@ -26,17 +26,25 @@ serve(async (req) => {
 
     const { userInput, context, trainingData }: CoachRequest = await req.json();
 
-    // Build context-aware system prompt
-    let systemPrompt = `You are a supportive wellness coach helping users with their digital habits and well-being. 
+    // Build context-aware system prompt with dynamic personality
+    const personalityTraits = determinePersonality(context);
     
-Your role is to:
-- Provide encouraging, empathetic responses
-- Offer practical suggestions for improving digital wellness
-- Help users understand their usage patterns
-- Support healthy habit formation
-- Be concise but warm in your responses
+    let systemPrompt = `You are a ${personalityTraits.type} wellness coach helping users with their digital habits and well-being. 
+    
+Your personality: ${personalityTraits.description}
 
-User Context: ${JSON.stringify(context)}`;
+Your role is to:
+- Provide encouraging, empathetic responses with your unique coaching style
+- Offer practical, personalized suggestions based on user patterns
+- Help users understand their usage patterns with specific insights
+- Support healthy habit formation through ${personalityTraits.approach}
+- Be concise but warm in your responses
+- Reference specific apps and usage patterns when relevant
+- Adapt your tone to the user's current emotional and usage state
+
+User Context: ${JSON.stringify(context)}
+Weekly patterns: ${analyzeWeeklyPatterns(context)}
+Current session context: ${getCurrentSessionContext(context)}`;
 
     // Include training data if available
     if (trainingData && trainingData.length > 0) {
@@ -107,7 +115,62 @@ User Context: ${JSON.stringify(context)}`;
   }
 });
 
-// Helper functions
+// Enhanced helper functions
+function determinePersonality(context: any): { type: string, description: string, approach: string } {
+  const { screenTime, trustScore, recentActivity, timeOfDay } = context;
+  
+  if (trustScore > 80 && recentActivity?.includes('Work Apps')) {
+    return {
+      type: 'Achievement-Focused',
+      description: 'You celebrate wins and help users optimize their already good habits',
+      approach: 'positive reinforcement and advanced strategies'
+    };
+  } else if (trustScore < 40 || screenTime > 400) {
+    return {
+      type: 'Gentle & Compassionate',
+      description: 'You approach struggles with deep empathy and never judge',
+      approach: 'small, manageable steps and emotional support'
+    };
+  } else if (timeOfDay === 'evening' && screenTime > 200) {
+    return {
+      type: 'Mindful Evening Guide',
+      description: 'You help users wind down and reflect on their day mindfully',
+      approach: 'evening reflection and calm transition strategies'
+    };
+  } else {
+    return {
+      type: 'Balanced Motivator',
+      description: 'You provide steady encouragement with practical wisdom',
+      approach: 'balanced motivation and actionable insights'
+    };
+  }
+}
+
+function analyzeWeeklyPatterns(context: any): string {
+  const { screenTime, trustScore, recentActivity } = context;
+  
+  // Simulate pattern analysis (in real app, this would come from actual historical data)
+  const patterns = [];
+  
+  if (screenTime > 300) patterns.push("high daily usage trending");
+  if (trustScore < 50) patterns.push("consistency challenges");
+  if (recentActivity?.includes('Games')) patterns.push("entertainment focus");
+  if (recentActivity?.includes('Work Apps')) patterns.push("productive usage balance");
+  
+  return patterns.length > 0 ? patterns.join(', ') : "building new awareness";
+}
+
+function getCurrentSessionContext(context: any): string {
+  const { timeOfDay, screenTime } = context;
+  const sessionContext = [];
+  
+  if (timeOfDay === 'morning' && screenTime < 60) sessionContext.push("fresh start energy");
+  if (timeOfDay === 'afternoon' && screenTime > 200) sessionContext.push("midday usage peak");
+  if (timeOfDay === 'evening') sessionContext.push("wind-down period");
+  
+  return sessionContext.join(', ') || "regular check-in";
+}
+
 function determineInterventionType(userInput: string, context: any): string {
   const input = userInput.toLowerCase();
   
