@@ -42,7 +42,7 @@ const DeviceTrackingStatus = () => {
         <div className="flex items-start space-x-2">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <div>
-            {screenTimeData.apps.length > 0 ? (
+            {screenTimeData?.apps?.length > 0 ? (
               <p>
                 Currently tracking <strong>{screenTimeData.apps.length} apps</strong> with{' '}
                 <strong>{screenTimeData.totalScreenTime} minutes</strong> of usage today.
