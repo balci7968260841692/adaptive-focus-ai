@@ -221,19 +221,22 @@ export class SystemAppTracker {
       
       if (deviceInfo.platform === 'android') {
         const hasPermission = await UsageTracker.hasUsageStatsPermission();
-        
-        if (!hasPermission.granted) {
-          console.log('Requesting usage stats permission...');
-          await UsageTracker.requestUsageStatsPermission();
-          return false;
-        }
-        
-        return true;
+        return hasPermission.granted;
       }
       
       return true; // Always return true for non-Android platforms
     } catch (error) {
       console.error('Error checking usage permission:', error);
+      return false;
+    }
+  }
+
+  async requestUsageStatsPermission(): Promise<boolean> {
+    try {
+      const result = await UsageTracker.requestUsageStatsPermission();
+      return result.granted;
+    } catch (error) {
+      console.error('Error requesting usage permission:', error);
       return false;
     }
   }

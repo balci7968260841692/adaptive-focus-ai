@@ -43,11 +43,11 @@ export const useDeviceTracking = () => {
         const deviceInfo = await Device.getInfo();
         console.log('Device info:', deviceInfo);
 
-        // For Android, check and request usage stats permission
+        // For Android, check usage stats permission (don't request automatically)
         if (deviceInfo.platform === 'android') {
           const hasPermission = await systemAppTracker.requestUsagePermissionIfNeeded();
           if (!hasPermission) {
-            console.log('Usage stats permission required for accurate tracking');
+            console.log('Usage stats permission required for accurate tracking - will show permission banner');
           }
         }
 

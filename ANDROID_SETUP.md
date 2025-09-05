@@ -44,8 +44,26 @@
 
 - The app requires **PACKAGE_USAGE_STATS** permission for real app usage tracking
 - This permission must be granted manually by the user through Settings
-- Without this permission, the app will show mock data
-- The permission dialog will be shown automatically when the app detects Android platform
+- The app includes comprehensive privacy controls and data management features
+- Users are presented with clear permission explanations before any system prompts
+- Without permissions, the app shows mock data and continues to function in limited mode
+
+## Privacy & Security Features
+
+- **Permission explanation dialogs** before requesting system permissions
+- **Privacy policy** accessible from app settings with clear data usage explanations
+- **Data export** functionality for full user data portability (GDPR/CCPA compliance)
+- **Data deletion** feature for complete account and data removal
+- **Graceful degradation** when permissions are denied (shows mock data)
+- **Transparent data collection** with clear explanations of what's collected and why
+
+## Permission Flow
+
+1. App loads without requesting permissions immediately
+2. User is shown a permission status banner if permissions not granted
+3. When user chooses to enable tracking, permission explanation dialog appears first
+4. Only after user accepts the explanation is the Android system permission dialog shown
+5. If denied, app continues with limited functionality and mock data
 
 ## Troubleshooting
 

@@ -11,8 +11,13 @@ import MLTrainingInterface from "../components/MLTrainingInterface";
 import FutureMessages from "../components/FutureMessages";
 import UserDataCollection from "../components/UserDataCollection";
 import DeviceTrackingStatus from "../components/DeviceTrackingStatus";
+import PermissionExplanationDialog from "../components/PermissionExplanationDialog";
+import PrivacyPolicyDialog from "../components/PrivacyPolicyDialog";
+import PermissionStatusBanner from "../components/PermissionStatusBanner";
+import DataManagementDialog from "../components/DataManagementDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeviceTracking } from "@/hooks/useDeviceTracking";
+import { SystemAppTracker } from "@/services/systemAppTracker";
 import { LogOut, User, Brain, Zap } from "lucide-react";
 
 const Index = () => {
@@ -20,8 +25,13 @@ const Index = () => {
   const [showAIChat, setShowAIChat] = useState(false);
   const [showCoachChat, setShowCoachChat] = useState(false);
   const [showMLTraining, setShowMLTraining] = useState(false);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
+  const [showDataManagement, setShowDataManagement] = useState(false);
+  const [hasUsagePermission, setHasUsagePermission] = useState(true);
+  const [systemAppTracker] = useState(new SystemAppTracker());
   const { user, profile, loading, signOut } = useAuth();
-  const { screenTimeData } = useDeviceTracking();
+  const { screenTimeData, loadTodaysData } = useDeviceTracking();
   const navigate = useNavigate();
 
   // Redirect to auth if not logged in
@@ -31,7 +41,19 @@ const Index = () => {
     }
   }, [user, loading, navigate]);
 
-  // Check if coach should show up (once a week) - moved before early returns
+  // Check permission status on load
+  useEffect(() => {
+    const checkPermissions = async () => {
+      if (user) {
+        const hasPermission = await systemAppTracker.requestUsagePermissionIfNeeded();
+        setHasUsagePermission(hasPermission);
+      }
+    };
+    
+    checkPermissions();
+  }, [user, systemAppTracker]);
+
+  // Check if coach should show up (once a week)
   const shouldShowWeeklyCoach = () => {
     const lastCoachVisit = localStorage.getItem('lastCoachVisit');
     const now = new Date().getTime();
@@ -43,7 +65,7 @@ const Index = () => {
     return false;
   };
 
-  // Auto-show coach if it's time for weekly check-in - moved before early returns
+  // Auto-show coach if it's time for weekly check-in
   useEffect(() => {
     if (shouldShowWeeklyCoach() && !showCoachChat && user) {
       const timer = setTimeout(() => {
@@ -58,6 +80,25 @@ const Index = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleRequestPermission = async () => {
+    setShowPermissionDialog(true);
+  };
+
+  const handleAcceptPermission = async () => {
+    setShowPermissionDialog(false);
+    const granted = await systemAppTracker.requestUsageStatsPermission();
+    setHasUsagePermission(granted);
+    if (granted) {
+      // Refresh data after permission granted
+      loadTodaysData();
+    }
+  };
+
+  const handleDeclinePermission = () => {
+    setShowPermissionDialog(false);
+    setHasUsagePermission(false);
   };
 
   if (loading) {
@@ -172,14 +213,38 @@ const Index = () => {
                 <div className="flex items-center space-x-3">
                   <User className="h-5 w-5" />
                   <div>
-            <p className="font-medium">{profile?.display_name || user?.email || 'User'}</p>
-            <p className="text-sm text-muted-foreground">{user?.email || 'Loading...'}</p>
+                    <p className="font-medium">{profile?.display_name || user?.email || 'User'}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email || 'Loading...'}</p>
                   </div>
                 </div>
                 <Button variant="outline" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Sign Out
                 </Button>
+              </div>
+              
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Privacy Policy</p>
+                    <p className="text-sm text-muted-foreground">View how we handle your data</p>
+                  </div>
+                  <Button variant="outline" onClick={() => setShowPrivacyDialog(true)}>
+                    View Policy
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Data Management</p>
+                    <p className="text-sm text-muted-foreground">Export or delete your personal data</p>
+                  </div>
+                  <Button variant="outline" onClick={() => setShowDataManagement(true)}>
+                    Manage Data
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>
@@ -241,12 +306,19 @@ const Index = () => {
         </div>
 
         {/* Navigation */}
-            <AppNavigation 
-              activeTab={activeTab} 
-              onTabChange={handleTabChange}
-              hasActiveOverride={hasActiveOverride}
-              trustScore={displayData?.trustScore || 0}
-            />
+        <AppNavigation 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange}
+          hasActiveOverride={hasActiveOverride}
+          trustScore={displayData?.trustScore || 0}
+        />
+
+        {/* Permission Status Banner */}
+        <PermissionStatusBanner 
+          hasPermission={hasUsagePermission}
+          onRequestPermission={handleRequestPermission}
+          onShowPrivacyPolicy={() => setShowPrivacyDialog(true)}
+        />
 
         {/* Main Content */}
         <div className="space-y-6">
@@ -277,6 +349,26 @@ const Index = () => {
         <MLTrainingInterface
           isOpen={showMLTraining}
           onClose={() => setShowMLTraining(false)}
+        />
+        
+        {/* Permission Explanation Dialog */}
+        <PermissionExplanationDialog
+          open={showPermissionDialog}
+          onOpenChange={setShowPermissionDialog}
+          onAccept={handleAcceptPermission}
+          onDecline={handleDeclinePermission}
+        />
+        
+        {/* Privacy Policy Dialog */}
+        <PrivacyPolicyDialog
+          open={showPrivacyDialog}
+          onOpenChange={setShowPrivacyDialog}
+        />
+        
+        {/* Data Management Dialog */}
+        <DataManagementDialog
+          open={showDataManagement}
+          onOpenChange={setShowDataManagement}
         />
       </div>
     </div>
