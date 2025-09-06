@@ -361,11 +361,74 @@ export const useDeviceTracking = () => {
     return iconMap[category] || '📱';
   };
 
+  const updateAppLimits = async (appLimitAdjustments: Array<{app: string, adjustment: number, reason: string}>) => {
+    if (!user || !appLimitAdjustments.length) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      for (const adjustment of appLimitAdjustments) {
+        // Find the app in current data
+        const app = screenTimeData.apps.find(a => 
+          a.name.toLowerCase().includes(adjustment.app.toLowerCase()) ||
+          adjustment.app.toLowerCase().includes(a.name.toLowerCase())
+        );
+
+        if (app) {
+          const newLimit = Math.max(0, app.timeLimit + adjustment.adjustment);
+          
+          // Update in database
+          await supabase
+            .from('app_usage')
+            .update({ time_limit: newLimit })
+            .eq('user_id', user.id)
+            .eq('app_name', app.name)
+            .eq('usage_date', today);
+        }
+      }
+
+      // Reload data to reflect changes
+      await loadTodaysData();
+      
+    } catch (error) {
+      console.error('Error updating app limits:', error);
+    }
+  };
+
+  const grantAppOverride = async (appName: string, additionalMinutes: number) => {
+    if (!user) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Find the app and increase its limit
+      const app = screenTimeData.apps.find(a => a.name === appName);
+      if (app) {
+        const newLimit = app.timeLimit + additionalMinutes;
+        
+        await supabase
+          .from('app_usage')
+          .update({ time_limit: newLimit })
+          .eq('user_id', user.id)
+          .eq('app_name', appName)
+          .eq('usage_date', today);
+
+        // Reload data
+        await loadTodaysData();
+      }
+      
+    } catch (error) {
+      console.error('Error granting app override:', error);
+    }
+  };
+
   return {
     screenTimeData,
     isTracking,
     updateDailyLimit,
     loadTodaysData,
-    updateAppUsage
+    updateAppUsage,
+    updateAppLimits,
+    grantAppOverride
   };
 };

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Bot, Send, Clock, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useDeviceTracking } from '@/hooks/useDeviceTracking';
 
 interface ChatMessage {
   id: string;
@@ -19,6 +20,8 @@ interface OverrideRequest {
   reason: string;
   context: string;
   status: 'pending' | 'approved' | 'denied' | 'negotiating';
+  appLimitAdjustments?: Array<{app: string, adjustment: number, reason: string}>;
+  conditions?: string[];
 }
 
 interface AIChatProps {
@@ -28,6 +31,7 @@ interface AIChatProps {
 }
 
 const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
+  const { screenTimeData, grantAppOverride, updateAppLimits } = useDeviceTracking();
   // Get training data from localStorage for context
   const getTrainingData = () => {
     try {
@@ -62,7 +66,7 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Use Gemini AI for override evaluation
+    // Use Gemini AI for override evaluation with current usage data
     try {
       const { data: overrideDecision, error } = await supabase.functions.invoke('override-ai', {
         body: {
@@ -71,11 +75,13 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
             requestedTime: 30,
             reason: inputValue,
             context: {
-              trustScore: 75, // This would come from user data
+              trustScore: screenTimeData.trustScore,
               recentOverrides: 1,
-              timeOfDay: new Date().getHours() > 17 ? 'evening' : 'day'
+              timeOfDay: new Date().getHours() > 17 ? 'evening' : 'day',
+              currentAppUsage: screenTimeData.apps.find(app => app.name === currentApp)
             }
           },
+          currentUsageData: screenTimeData,
           trainingData: getTrainingData()
         }
       });
@@ -160,14 +166,35 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
     }
   };
 
-  const handleAcceptNegotiation = () => {
+  const handleAcceptNegotiation = async () => {
     if (!overrideRequest) return;
     
+    // Apply the override to the app's time limit
+    await grantAppOverride(overrideRequest.app, overrideRequest.requestedTime);
+    
+    // Apply any app limit adjustments if specified
+    if (overrideRequest.appLimitAdjustments && overrideRequest.appLimitAdjustments.length > 0) {
+      await updateAppLimits(overrideRequest.appLimitAdjustments);
+    }
+    
     setOverrideRequest({ ...overrideRequest, status: 'approved' });
+    
+    let responseMessage = `Great! I've granted you ${overrideRequest.requestedTime} minutes for ${overrideRequest.app}.`;
+    
+    if (overrideRequest.appLimitAdjustments && overrideRequest.appLimitAdjustments.length > 0) {
+      responseMessage += ` I've also adjusted some other app limits to balance your usage.`;
+    }
+    
+    if (overrideRequest.conditions && overrideRequest.conditions.length > 0) {
+      responseMessage += ` Remember: ${overrideRequest.conditions.join(' ')}`;
+    }
+    
+    responseMessage += ` Use this time wisely! 🎯`;
+    
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       type: 'ai',
-      content: `Great! I've granted you ${overrideRequest.requestedTime} minutes. I'll check in with you when time is up. Use this time wisely! 🎯`,
+      content: responseMessage,
       timestamp: new Date()
     }]);
   };
@@ -187,13 +214,15 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
   const generateAIResponseFromML = (decision: any, userInput: string) => {
     if (decision.approved) {
       return {
-        message: `${decision.reasoning} I can grant you ${decision.maxTime} minutes. ${decision.conditions ? decision.conditions.join(' ') : ''}`,
+        message: decision.reasoning,
         request: {
           app: currentApp,
           requestedTime: decision.maxTime,
           reason: userInput,
           context: `AI Decision - Confidence: ${Math.round(decision.confidence * 100)}%`,
-          status: 'negotiating' as const
+          status: 'negotiating' as const,
+          appLimitAdjustments: decision.appLimitAdjustments || [],
+          conditions: decision.conditions || []
         }
       };
     } else {
@@ -204,7 +233,9 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
           requestedTime: 5,
           reason: userInput,
           context: "AI suggested alternative",
-          status: 'negotiating' as const
+          status: 'negotiating' as const,
+          appLimitAdjustments: [],
+          conditions: []
         }
       };
     }
@@ -272,12 +303,34 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
                   <span className="text-muted-foreground">Time:</span>
                   <span className="font-medium text-foreground">{overrideRequest.requestedTime} minutes</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Context:</span>
-                  <Badge variant="outline" className="text-xs">
-                    {overrideRequest.context.includes('verification') ? 'Needs Review' : 'Suggested'}
-                  </Badge>
-                </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Context:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {overrideRequest.context.includes('verification') ? 'Needs Review' : 'Smart Decision'}
+                    </Badge>
+                  </div>
+                  {overrideRequest.appLimitAdjustments && overrideRequest.appLimitAdjustments.length > 0 && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-medium">Limit adjustments:</span>
+                      <ul className="mt-1 space-y-1">
+                        {overrideRequest.appLimitAdjustments.map((adj, index) => (
+                          <li key={index}>
+                            • {adj.app}: {adj.adjustment > 0 ? '+' : ''}{adj.adjustment} min
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {overrideRequest.conditions && overrideRequest.conditions.length > 0 && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-medium">Conditions:</span>
+                      <ul className="mt-1 space-y-1">
+                        {overrideRequest.conditions.map((condition, index) => (
+                          <li key={index}>• {condition}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
               </div>
 
               <div className="flex space-x-2 mt-4">
