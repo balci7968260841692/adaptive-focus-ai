@@ -66,8 +66,23 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
 
     setMessages(prev => [...prev, userMessage]);
     
-    // Use Gemini AI for override evaluation with current usage data
+    // Use enhanced AI for override evaluation
     try {
+      console.log('Sending request to override-ai with data:', {
+        request: {
+          app: currentApp,
+          requestedTime: 30,
+          reason: inputValue,
+          context: {
+            trustScore: screenTimeData?.trustScore || 50,
+            recentOverrides: 1,
+            timeOfDay: new Date().getHours() > 17 ? 'evening' : (new Date().getHours() < 12 ? 'morning' : 'afternoon'),
+            currentAppUsage: screenTimeData?.apps?.find(app => app.name === currentApp)
+          }
+        },
+        currentUsageData: screenTimeData,
+        trainingData: getTrainingData()
+      });
       const { data: overrideDecision, error } = await supabase.functions.invoke('override-ai', {
         body: {
           request: {
@@ -75,10 +90,10 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
             requestedTime: 30,
             reason: inputValue,
             context: {
-              trustScore: screenTimeData.trustScore,
+              trustScore: screenTimeData?.trustScore || 50,
               recentOverrides: 1,
-              timeOfDay: new Date().getHours() > 17 ? 'evening' : 'day',
-              currentAppUsage: screenTimeData.apps.find(app => app.name === currentApp)
+              timeOfDay: new Date().getHours() > 17 ? 'evening' : (new Date().getHours() < 12 ? 'morning' : 'afternoon'),
+              currentAppUsage: screenTimeData?.apps?.find(app => app.name === currentApp)
             }
           },
           currentUsageData: screenTimeData,
@@ -86,7 +101,12 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Override AI Error:', error);
+        throw error;
+      }
+
+      console.log('Override AI Response:', overrideDecision);
 
       // Add training data
       const trainingData = getTrainingData();
@@ -110,6 +130,7 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
         setOverrideRequest(aiResponse.request);
       }
     } catch (error) {
+      console.error('Error calling override-ai:', error);
       // Fallback to template response
       const aiResponse = generateAIResponse(inputValue);
       setMessages(prev => [...prev, {
@@ -212,9 +233,18 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
   };
 
   const generateAIResponseFromML = (decision: any, userInput: string) => {
+    console.log('AI Decision received:', decision);
+    
     if (decision.approved) {
+      let message = decision.reasoning;
+      
+      // Add confirmation message if it's a successful approval
+      if (decision.confidence > 0.8 && !decision.reasoning.toLowerCase().includes('i can offer')) {
+        message += ' Ready to grant this time?';
+      }
+      
       return {
-        message: decision.reasoning,
+        message,
         request: {
           app: currentApp,
           requestedTime: decision.maxTime,
@@ -226,17 +256,27 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
         }
       };
     } else {
+      // For denied requests, show the reasoning and suggest alternatives
+      let message = decision.reasoning;
+      
+      // Only add fallback suggestion if AI didn't already suggest alternatives
+      if (!decision.reasoning.toLowerCase().includes('how about') && 
+          !decision.reasoning.toLowerCase().includes('instead') &&
+          !decision.reasoning.toLowerCase().includes('try')) {
+        message += ' How about taking a 5-minute mindful break instead?';
+      }
+      
       return {
-        message: `${decision.reasoning} How about we try a 5-minute mindful break instead?`,
-        request: {
+        message,
+        request: decision.negotiable ? {
           app: currentApp,
           requestedTime: 5,
           reason: userInput,
           context: "AI suggested alternative",
           status: 'negotiating' as const,
           appLimitAdjustments: [],
-          conditions: []
-        }
+          conditions: ['Take a mindful break first']
+        } : null
       };
     }
   };

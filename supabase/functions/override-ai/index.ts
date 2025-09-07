@@ -41,33 +41,41 @@ serve(async (req) => {
 
     const { request, currentUsageData, trainingData }: OverrideRequest = await req.json();
 
-    // Build system prompt for override evaluation with current usage context
-    let systemPrompt = `You are an AI assistant that evaluates requests for app time limit overrides based on current usage patterns.
+// Build comprehensive system prompt for smart override evaluation
+    let systemPrompt = `You are a wellness-focused AI that helps users manage screen time intelligently. Evaluate override requests based on usage patterns, context, and user well-being.
 
-CRITICAL: Respond with a simple, conversational explanation of your decision. No JSON, no structured format, no verbose reasoning.
+DECISION FRAMEWORK:
+1. Assess if request is reasonable given current usage
+2. Consider user's trust score and recent behavior
+3. Evaluate time of day and app category appropriateness
+4. Make contextual decisions that promote healthy habits
 
-Current Usage Analysis:
+CURRENT USAGE CONTEXT:
 ${currentUsageData ? `
-- Total screen time today: ${currentUsageData.totalScreenTime} minutes (limit: ${currentUsageData.dailyLimit} minutes)
-- Trust score: ${currentUsageData.trustScore}/100
-- Apps currently over limit: ${currentUsageData.apps.filter(app => app.timeUsed > app.timeLimit).map(app => `${app.name} (${app.timeUsed}/${app.timeLimit}min)`).join(', ') || 'None'}
-- Most used categories: ${currentUsageData.apps.sort((a, b) => b.timeUsed - a.timeUsed).slice(0, 3).map(app => `${app.category}: ${app.timeUsed}min`).join(', ')}
-` : 'Usage data not available'}
+📱 Daily Usage: ${currentUsageData.totalScreenTime}/${currentUsageData.dailyLimit} minutes (${Math.round((currentUsageData.totalScreenTime/currentUsageData.dailyLimit)*100)}% of limit)
+🎯 Trust Score: ${currentUsageData.trustScore}/100
+⚠️ Over-limit apps: ${currentUsageData.apps.filter(app => app.timeUsed > app.timeLimit).map(app => `${app.name} (${app.timeUsed}/${app.timeLimit}min, +${app.timeUsed-app.timeLimit}min over)`).join(', ') || 'None'}
+📊 Top categories: ${currentUsageData.apps.sort((a, b) => b.timeUsed - a.timeUsed).slice(0, 3).map(app => `${app.category}: ${app.timeUsed}min`).join(', ')}
+` : 'Usage data unavailable'}
 
-Current Request:
-- App: ${request.app}
-- Requested additional time: ${request.requestedTime} minutes  
-- User's reason: ${request.reason}
-- Context: ${JSON.stringify(request.context)}
+REQUEST DETAILS:
+🎯 App: ${request.app}
+⏱️ Requested time: ${request.requestedTime} minutes
+💭 User reason: "${request.reason}"
+🔍 Context: Time ${request.context.timeOfDay}, Trust: ${request.context.trustScore}/100
 
-Smart Negotiation Guidelines:
-- If user is near/over daily limit, suggest redistributing time from less important apps
-- For work/education requests, be more generous but set conditions
-- For entertainment apps, consider current usage patterns and trust score
-- Offer specific alternatives (e.g., "I can give you 15 minutes if you take a 5-minute break from social media")
-- Consider time of day and usage patterns
+DECISION CRITERIA:
+- DENY if: User is >120% daily limit OR trust score <30 OR requesting entertainment apps late evening
+- APPROVE if: Work/education apps during work hours OR trust score >80 AND reasonable request
+- NEGOTIATE if: Borderline cases - offer alternatives, conditions, or reduced time
 
-Respond naturally with your decision and reasoning. Start with "Approved", "Denied", or "I can offer" for negotiations. Be specific about any time redistributions or conditions.`;
+RESPONSE RULES:
+- Start clearly: "Approved: [reason]" OR "Denied: [reason]" OR "I can offer: [alternative]"
+- Be specific about time allocations and conditions
+- Suggest healthy alternatives for denied requests
+- Keep response under 100 words, friendly but firm tone
+
+Time context: ${new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}`;
 
     // Include training data if available
     if (trainingData && trainingData.length > 0) {
@@ -91,10 +99,10 @@ Respond naturally with your decision and reasoning. Start with "Approved", "Deni
           }
         ],
         generationConfig: {
-          temperature: 0.3,
-          topK: 20,
-          topP: 0.8,
-          maxOutputTokens: 150,
+          temperature: 0.4,
+          topK: 40,
+          topP: 0.9,
+          maxOutputTokens: 200,
         }
       }),
     });
@@ -108,8 +116,8 @@ Respond naturally with your decision and reasoning. Start with "Approved", "Deni
     const data = await response.json();
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Let AI make the full decision - minimal parsing to preserve generative nature
-    const decision = parseMinimalDecision(generatedText, request);
+    // Enhanced parsing for better decision accuracy
+    const decision = parseEnhancedDecision(generatedText, request);
 
     console.log('Override AI Decision:', decision);
 
@@ -133,35 +141,69 @@ Respond naturally with your decision and reasoning. Start with "Approved", "Deni
   }
 });
 
-function parseMinimalDecision(aiResponse: string, request: any) {
+function parseEnhancedDecision(aiResponse: string, request: any) {
   const text = aiResponse.toLowerCase();
+  const originalResponse = aiResponse;
   
-  // Simple approval detection - let AI handle the rest
+  // Enhanced decision parsing with better logic
   let approved = false;
   let maxTime = 0;
+  let confidence = 0.7;
+  let negotiable = true;
   
-  // Basic approval detection
-  if (text.includes('approved') || text.includes('approve') || text.includes('grant') || text.includes('allow') || text.includes('yes') || text.includes('i can offer')) {
+  // Determine approval status with more nuanced detection
+  if (text.includes('approved:') || text.includes('approve') || text.includes('granted') || text.includes('yes, you can')) {
     approved = true;
-    
-    // Try to extract specific time offers from AI response
-    const timeMatches = text.match(/(\d+)\s*(?:minute|min)/g);
-    if (timeMatches) {
-      const numbers = timeMatches.map(match => parseInt(match.match(/\d+/)[0]));
-      maxTime = Math.max(...numbers); // Use the largest time mentioned
-    } else {
-      maxTime = request.requestedTime; // Default to full request if no specific time mentioned
-    }
+    confidence = 0.9;
+  } else if (text.includes('denied:') || text.includes('deny') || text.includes('cannot approve') || text.includes('not granting')) {
+    approved = false;
+    confidence = 0.9;
+    negotiable = false;
+  } else if (text.includes('i can offer') || text.includes('instead, i can') || text.includes('how about')) {
+    approved = true; // It's a counter-offer
+    confidence = 0.8;
+    negotiable = true;
   }
   
-  // Let AI handle app adjustments and conditions through natural language
+  // Extract time more intelligently
+  const timeMatches = text.match(/(\d+)\s*(?:minute|min)/g);
+  if (timeMatches) {
+    const numbers = timeMatches.map(match => parseInt(match.match(/\d+/)[0]));
+    // Use the first mentioned time if it's a counter-offer, otherwise the largest
+    if (text.includes('i can offer') || text.includes('instead')) {
+      maxTime = numbers[0] || 0;
+    } else {
+      maxTime = approved ? Math.max(...numbers) : 0;
+    }
+  } else if (approved) {
+    maxTime = Math.min(request.requestedTime, 30); // Cap at 30 minutes if no specific time
+  }
+  
+  // Extract conditions from the response
+  const conditions = [];
+  if (text.includes('condition') || text.includes('requirement') || text.includes('must')) {
+    conditions.push('Follow the AI\'s specific guidance');
+  }
+  if (text.includes('break') || text.includes('pause')) {
+    conditions.push('Take a break as suggested');
+  }
+  if (text.includes('work') && text.includes('only')) {
+    conditions.push('Use only for work purposes');
+  }
+  
+  // Determine app adjustments based on AI suggestion
+  const appLimitAdjustments = [];
+  if (text.includes('reduce') || text.includes('cut back') || text.includes('less time')) {
+    // AI is suggesting to reduce usage elsewhere - we'll let the frontend handle this
+  }
+  
   return {
     approved,
-    reasoning: aiResponse, // Keep full AI response
-    confidence: 0.9,
-    conditions: [], // Let AI communicate conditions in reasoning text
+    reasoning: originalResponse,
+    confidence,
+    conditions,
     maxTime,
-    appLimitAdjustments: [], // Let AI handle this through reasoning text
-    negotiable: true // Always allow further negotiation
+    appLimitAdjustments,
+    negotiable
   };
 }
