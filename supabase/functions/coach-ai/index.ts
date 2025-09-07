@@ -87,12 +87,12 @@ Respond naturally as if you're having a friendly conversation. Keep it brief and
     const data = await response.json();
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I understand. How can I help you with your wellness goals?';
 
-    // Structure the response to match the expected CoachResponse format
+    // Use AI-generated response directly without predetermined overrides
     const coachResponse = {
       content: generatedText,
-      interventionType: determineInterventionType(userInput, context),
-      suggestion: generateSuggestion(userInput, context),
-      confidence: 0.8 // Default confidence
+      interventionType: "ai-generated", 
+      suggestion: "", // Let the AI include suggestions in the main content
+      confidence: 0.9
     };
 
     console.log('Coach AI Response:', coachResponse);

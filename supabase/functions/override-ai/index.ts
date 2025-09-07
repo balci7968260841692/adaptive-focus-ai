@@ -108,8 +108,8 @@ Respond naturally with your decision and reasoning. Start with "Approved", "Deni
     const data = await response.json();
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // Parse the AI response to extract decision, reasoning, etc.
-    const decision = parseDecision(generatedText, request);
+    // Let AI make the full decision - minimal parsing to preserve generative nature
+    const decision = parseMinimalDecision(generatedText, request);
 
     console.log('Override AI Decision:', decision);
 
@@ -133,80 +133,35 @@ Respond naturally with your decision and reasoning. Start with "Approved", "Deni
   }
 });
 
-function parseDecision(aiResponse: string, request: any) {
+function parseMinimalDecision(aiResponse: string, request: any) {
   const text = aiResponse.toLowerCase();
   
-  // Determine decision
+  // Simple approval detection - let AI handle the rest
   let approved = false;
   let maxTime = 0;
-  let appLimitAdjustments = [];
   
-  if (text.includes('approved') || text.includes('approve') || text.includes('grant') || text.includes('allow')) {
+  // Basic approval detection
+  if (text.includes('approved') || text.includes('approve') || text.includes('grant') || text.includes('allow') || text.includes('yes') || text.includes('i can offer')) {
     approved = true;
-    maxTime = request.requestedTime;
-  } else if (text.includes('i can offer') || text.includes('negotiate') || text.includes('compromise') || text.includes('partial')) {
-    approved = true;
-    // Extract number from "I can offer X minutes"
-    const offerMatch = text.match(/offer (?:you )?(\d+)/);
-    if (offerMatch) {
-      maxTime = parseInt(offerMatch[1]);
+    
+    // Try to extract specific time offers from AI response
+    const timeMatches = text.match(/(\d+)\s*(?:minute|min)/g);
+    if (timeMatches) {
+      const numbers = timeMatches.map(match => parseInt(match.match(/\d+/)[0]));
+      maxTime = Math.max(...numbers); // Use the largest time mentioned
     } else {
-      maxTime = Math.min(Math.floor(request.requestedTime / 2), 15);
+      maxTime = request.requestedTime; // Default to full request if no specific time mentioned
     }
   }
   
-  // Extract app limit redistributions
-  const redistributeMatches = text.match(/reduce (\w+) by (\d+)/g);
-  if (redistributeMatches) {
-    redistributeMatches.forEach(match => {
-      const [, appName, minutes] = match.match(/reduce (\w+) by (\d+)/) || [];
-      if (appName && minutes) {
-        appLimitAdjustments.push({
-          app: appName,
-          adjustment: -parseInt(minutes),
-          reason: 'Redistributed for override request'
-        });
-      }
-    });
-  }
-  
-  // Extract time reallocation suggestions
-  const reallocationMatches = text.match(/take (\d+) minutes? from (\w+)/g);
-  if (reallocationMatches) {
-    reallocationMatches.forEach(match => {
-      const [, minutes, appName] = match.match(/take (\d+) minutes? from (\w+)/) || [];
-      if (appName && minutes) {
-        appLimitAdjustments.push({
-          app: appName,
-          adjustment: -parseInt(minutes),
-          reason: 'Time reallocated for override'
-        });
-      }
-    });
-  }
-  
-  // Extract conditions (enhanced parsing)
-  const conditions = [];
-  if (text.includes('break') || text.includes('pause')) {
-    conditions.push("Take regular breaks every 20 minutes");
-  }
-  if (text.includes('limit') || text.includes('restrict') || text.includes('specifically')) {
-    conditions.push("Use this time specifically for the stated purpose");
-  }
-  if (text.includes('focus') || text.includes('productive')) {
-    conditions.push("Focus on productive tasks during this time");
-  }
-  if (text.includes('check in') || text.includes('review')) {
-    conditions.push("I'll check your usage and adjust if needed");
-  }
-  
+  // Let AI handle app adjustments and conditions through natural language
   return {
     approved,
-    reasoning: aiResponse,
-    confidence: 0.8,
-    conditions,
+    reasoning: aiResponse, // Keep full AI response
+    confidence: 0.9,
+    conditions: [], // Let AI communicate conditions in reasoning text
     maxTime,
-    appLimitAdjustments,
-    negotiable: text.includes('negotiate') || text.includes('compromise') || text.includes('i can offer')
+    appLimitAdjustments: [], // Let AI handle this through reasoning text
+    negotiable: true // Always allow further negotiation
   };
 }
