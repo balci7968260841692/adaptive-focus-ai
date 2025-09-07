@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Brain, Heart } from 'lucide-react';
@@ -12,6 +13,7 @@ import { useEffect } from 'react';
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -50,6 +52,16 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!agreedToTerms) {
+      toast({
+        variant: "destructive",
+        title: "Terms & Conditions Required",
+        description: "Please agree to the Terms & Conditions to create an account."
+      });
+      return;
+    }
+    
     const formData = new FormData(e.target as HTMLFormElement);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
@@ -166,7 +178,19 @@ const Auth = () => {
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <div className="flex items-start space-x-2">
+                    <Checkbox
+                      id="terms"
+                      checked={agreedToTerms}
+                      onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                    />
+                    <Label htmlFor="terms" className="text-sm leading-5 cursor-pointer">
+                      I agree to the{' '}
+                      <span className="text-primary underline">Terms & Conditions</span> and{' '}
+                      <span className="text-primary underline">Privacy Policy</span>, including the collection and use of my data for AI model training and commercial purposes.
+                    </Label>
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms}>
                     {isLoading ? 'Creating Account...' : 'Create Account'}
                   </Button>
                 </form>
