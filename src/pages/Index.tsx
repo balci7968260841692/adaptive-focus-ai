@@ -35,6 +35,53 @@ const Index = () => {
   const { screenTimeData, loadTodaysData } = useDeviceTracking();
   const navigate = useNavigate();
 
+  // Use real tracking data, fallback to demo data if no real data available
+  const displayData = (screenTimeData?.apps?.length > 0) ? screenTimeData : {
+    totalScreenTime: 245, // minutes
+    dailyLimit: 360, // 6 hours in minutes
+    trustScore: 75,
+    apps: [
+      {
+        name: "Social Media",
+        icon: "📱",
+        timeUsed: 135, // minutes
+        timeLimit: 180, // 3 hours
+        category: "Social"
+      },
+      {
+        name: "Work Apps",
+        icon: "💼",
+        timeUsed: 105, // 1h 45m
+        timeLimit: 480, // 8 hours
+        category: "Productivity"
+      },
+      {
+        name: "Entertainment",
+        icon: "🎬",
+        timeUsed: 30,
+        timeLimit: 60, // 1 hour
+        category: "Entertainment"
+      },
+      {
+        name: "Games",
+        icon: "🎮",
+        timeUsed: 150, // 2h 30m
+        timeLimit: 90, // 1h 30m
+        category: "Games"
+      }
+    ]
+  };
+
+  const hasActiveOverride = displayData?.apps?.some(app => app.timeUsed >= app.timeLimit) || false;
+  const currentOverrideApp = displayData?.apps?.find(app => app.timeUsed >= app.timeLimit)?.name || "Unknown App";
+
+  // Inspiration messages system - MUST be called before any early returns
+  const { shouldShowInspiration, currentMessage, dismissMessage, triggerInspiration } = useInspirationMessages(
+    displayData?.totalScreenTime || 0,
+    displayData?.trustScore || 0,
+    hasActiveOverride
+  );
+
   // Redirect to auth if not logged in
   useEffect(() => {
     if (!loading && !user) {
@@ -117,52 +164,6 @@ const Index = () => {
     return null; // Will redirect to auth
   }
 
-  // Use real tracking data, fallback to demo data if no real data available
-  const displayData = (screenTimeData?.apps?.length > 0) ? screenTimeData : {
-    totalScreenTime: 245, // minutes
-    dailyLimit: 360, // 6 hours in minutes
-    trustScore: 75,
-    apps: [
-      {
-        name: "Social Media",
-        icon: "📱",
-        timeUsed: 135, // minutes
-        timeLimit: 180, // 3 hours
-        category: "Social"
-      },
-      {
-        name: "Work Apps",
-        icon: "💼",
-        timeUsed: 105, // 1h 45m
-        timeLimit: 480, // 8 hours
-        category: "Productivity"
-      },
-      {
-        name: "Entertainment",
-        icon: "🎬",
-        timeUsed: 30,
-        timeLimit: 60, // 1 hour
-        category: "Entertainment"
-      },
-      {
-        name: "Games",
-        icon: "🎮",
-        timeUsed: 150, // 2h 30m
-        timeLimit: 90, // 1h 30m
-        category: "Games"
-      }
-    ]
-  };
-
-  const hasActiveOverride = displayData?.apps?.some(app => app.timeUsed >= app.timeLimit) || false;
-  const currentOverrideApp = displayData?.apps?.find(app => app.timeUsed >= app.timeLimit)?.name || "Unknown App";
-
-  // Inspiration messages system
-  const { shouldShowInspiration, currentMessage, dismissMessage, triggerInspiration } = useInspirationMessages(
-    displayData?.totalScreenTime || 0,
-    displayData?.trustScore || 0,
-    hasActiveOverride
-  );
 
   const handleTabChange = (tab: string) => {
     if (tab === 'ai-chat') {
