@@ -40,12 +40,6 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       description: 'Analytics'
     },
     {
-      id: 'future-messages',
-      label: 'Messages',
-      icon: MessageCircle,
-      description: 'Future Self'
-    },
-    {
       id: 'data-collection',
       label: 'Profile',
       icon: Brain,

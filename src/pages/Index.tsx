@@ -8,8 +8,8 @@ import AppLimitsSettings from "../components/AppLimitsSettings";
 import AIOverrideChat from "../components/AIOverrideChat";
 import HabitCoachChat from "../components/HabitCoachChat";
 import MLTrainingInterface from "../components/MLTrainingInterface";
-import FutureMessages from "../components/FutureMessages";
 import UserDataCollection from "../components/UserDataCollection";
+import InspirationMessageModal from "../components/InspirationMessageModal";
 import DeviceTrackingStatus from "../components/DeviceTrackingStatus";
 import PermissionExplanationDialog from "../components/PermissionExplanationDialog";
 import PrivacyPolicyDialog from "../components/PrivacyPolicyDialog";
@@ -17,6 +17,7 @@ import PermissionStatusBanner from "../components/PermissionStatusBanner";
 import DataManagementDialog from "../components/DataManagementDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeviceTracking } from "@/hooks/useDeviceTracking";
+import { useInspirationMessages } from "@/hooks/useInspirationMessages";
 import { SystemAppTracker } from "@/services/systemAppTracker";
 import { LogOut, User, Brain, Zap } from "lucide-react";
 
@@ -156,6 +157,13 @@ const Index = () => {
   const hasActiveOverride = displayData?.apps?.some(app => app.timeUsed >= app.timeLimit) || false;
   const currentOverrideApp = displayData?.apps?.find(app => app.timeUsed >= app.timeLimit)?.name || "Unknown App";
 
+  // Inspiration messages system
+  const { shouldShowInspiration, currentMessage, dismissMessage, triggerInspiration } = useInspirationMessages(
+    displayData?.totalScreenTime || 0,
+    displayData?.trustScore || 0,
+    hasActiveOverride
+  );
+
   const handleTabChange = (tab: string) => {
     if (tab === 'ai-chat') {
       setShowAIChat(true);
@@ -176,8 +184,6 @@ const Index = () => {
           trustScore={displayData?.trustScore || 0}
           apps={displayData?.apps || []}
         />;
-      case "future-messages":
-        return <FutureMessages />;
       case "data-collection":
         return <UserDataCollection />;
       case "ml-training":
@@ -369,6 +375,13 @@ const Index = () => {
         <DataManagementDialog
           open={showDataManagement}
           onOpenChange={setShowDataManagement}
+        />
+        
+        {/* Inspiration Message Modal */}
+        <InspirationMessageModal
+          isOpen={shouldShowInspiration}
+          message={currentMessage}
+          onClose={dismissMessage}
         />
       </div>
     </div>
