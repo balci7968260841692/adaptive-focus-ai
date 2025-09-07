@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
@@ -49,6 +49,20 @@ export const useInspirationMessages = (
     loadMessages();
   }, [user]);
 
+  const triggerInspiration = useCallback(() => {
+    if (availableMessages.length === 0) return;
+
+    // Pick a random message
+    const randomMessage = availableMessages[Math.floor(Math.random() * availableMessages.length)];
+    setCurrentMessage(randomMessage);
+    setShouldShowInspiration(true);
+
+    // Mark the time
+    if (user) {
+      localStorage.setItem(`lastInspiration_${user.id}`, Date.now().toString());
+    }
+  }, [availableMessages, user]);
+
   // Check if inspiration should be triggered
   useEffect(() => {
     if (!user || availableMessages.length === 0) return;
@@ -86,23 +100,9 @@ export const useInspirationMessages = (
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(timer);
-  }, [user, availableMessages, screenTime, trustScore, hasActiveOverride, shouldShowInspiration]);
+  }, [user, availableMessages, screenTime, trustScore, hasActiveOverride, shouldShowInspiration, triggerInspiration]);
 
-  const triggerInspiration = () => {
-    if (availableMessages.length === 0) return;
-
-    // Pick a random message
-    const randomMessage = availableMessages[Math.floor(Math.random() * availableMessages.length)];
-    setCurrentMessage(randomMessage);
-    setShouldShowInspiration(true);
-
-    // Mark the time
-    if (user) {
-      localStorage.setItem(`lastInspiration_${user.id}`, Date.now().toString());
-    }
-  };
-
-  const dismissMessage = async () => {
+  const dismissMessage = useCallback(async () => {
     setShouldShowInspiration(false);
     
     // Mark message as delivered
@@ -117,7 +117,7 @@ export const useInspirationMessages = (
     }
     
     setCurrentMessage(null);
-  };
+  }, [currentMessage, user]);
 
   return {
     shouldShowInspiration,
