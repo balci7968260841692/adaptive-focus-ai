@@ -187,7 +187,7 @@ const Auth = () => {
                     <Label htmlFor="terms" className="text-sm leading-5 cursor-pointer">
                       I agree to the{' '}
                       <span className="text-primary underline">Terms & Conditions</span> and{' '}
-                      <span className="text-primary underline">Privacy Policy</span>, including the collection and use of my data for AI model training and commercial purposes.
+                      <span className="text-primary underline">Privacy Policy</span>
                     </Label>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading || !agreedToTerms}>
