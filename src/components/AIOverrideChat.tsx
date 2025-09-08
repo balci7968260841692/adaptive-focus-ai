@@ -31,7 +31,7 @@ interface AIChatProps {
 }
 
 const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
-  const { screenTimeData, grantAppOverride, updateAppLimits } = useDeviceTracking();
+  const { screenTimeData, grantAppOverride, updateAppLimits, grantManualOverride, getManualOverrideCount } = useDeviceTracking();
   // Get training data from localStorage for context
   const getTrainingData = () => {
     try {
@@ -53,6 +53,7 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
   
   const [inputValue, setInputValue] = useState('');
   const [overrideRequest, setOverrideRequest] = useState<OverrideRequest | null>(null);
+  const [showManualOverride, setShowManualOverride] = useState(false);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -224,10 +225,28 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
     if (!overrideRequest) return;
     
     setOverrideRequest({ ...overrideRequest, status: 'denied' });
+    setShowManualOverride(true);
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
       type: 'ai',
-      content: "I understand. How about taking a 5-minute walk or doing some breathing exercises? I'll be here when you're ready to try a more focused approach.",
+      content: "I understand. How about taking a 5-minute walk or doing some breathing exercises? If you still need to continue, you can use a manual override below.",
+      timestamp: new Date()
+    }]);
+  };
+
+  const handleManualOverride = async (minutes: number = 30) => {
+    const manualOverrideCount = getManualOverrideCount('today');
+    const reason = `Manual override ${manualOverrideCount + 1} - User bypassed AI recommendation`;
+    
+    await grantManualOverride(currentApp, minutes, reason);
+    
+    setOverrideRequest(prev => prev ? { ...prev, status: 'approved' } : null);
+    setShowManualOverride(false);
+    
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      type: 'ai',
+      content: `Manual override granted: ${minutes} minutes for ${currentApp}. This is your ${manualOverrideCount + 1} manual override today. Please use this time mindfully. 🚨`,
       timestamp: new Date()
     }]);
   };
@@ -265,6 +284,9 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
           !decision.reasoning.toLowerCase().includes('try')) {
         message += ' How about taking a 5-minute mindful break instead?';
       }
+      
+      // Show manual override option for denied requests
+      setShowManualOverride(true);
       
       return {
         message,
@@ -403,6 +425,50 @@ const AIOverrideChat = ({ isOpen, onClose, currentApp }: AIChatProps) => {
                 Override Approved
               </Badge>
             </div>
+          )}
+
+          {/* Manual Override Option */}
+          {showManualOverride && (
+            <Card className="p-4 bg-destructive/10 border-destructive/20 animate-slide-up">
+              <div className="flex items-center space-x-2 mb-3">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                <span className="text-sm font-medium text-foreground">Manual Override</span>
+                <Badge variant="destructive" className="text-xs">
+                  Today: {getManualOverrideCount('today')}
+                </Badge>
+              </div>
+              
+              <p className="text-sm text-muted-foreground mb-4">
+                You can bypass the AI recommendation and continue using the app. This will be tracked and may affect your wellness score.
+              </p>
+
+              <div className="flex space-x-2">
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={() => handleManualOverride(15)}
+                  className="flex-1"
+                >
+                  15 min override
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive"
+                  onClick={() => handleManualOverride(30)}
+                  className="flex-1"
+                >
+                  30 min override
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setShowManualOverride(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </Card>
           )}
         </div>
 

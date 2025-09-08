@@ -422,6 +422,81 @@ export const useDeviceTracking = () => {
     }
   };
 
+  const grantManualOverride = async (appName: string, additionalMinutes: number, reason: string) => {
+    if (!user) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Track manual override
+      const manualOverrides = JSON.parse(localStorage.getItem('manual_overrides') || '[]');
+      manualOverrides.push({
+        app: appName,
+        minutes: additionalMinutes,
+        reason,
+        timestamp: Date.now(),
+        date: today
+      });
+      localStorage.setItem('manual_overrides', JSON.stringify(manualOverrides));
+      
+      // Find the app and increase its limit
+      const app = screenTimeData.apps.find(a => a.name === appName);
+      if (app) {
+        const newLimit = app.timeLimit + additionalMinutes;
+        
+        await supabase
+          .from('app_usage')
+          .update({ time_limit: newLimit })
+          .eq('user_id', user.id)
+          .eq('app_name', appName)
+          .eq('usage_date', today);
+
+        // Reduce trust score for manual overrides
+        const currentTrust = screenTimeData.trustScore;
+        const newTrustScore = Math.max(0, currentTrust - 5);
+        
+        await supabase
+          .from('screen_time_summary')
+          .upsert({
+            user_id: user.id,
+            usage_date: today,
+            trust_score: newTrustScore,
+            total_screen_time: screenTimeData.totalScreenTime,
+            daily_limit: screenTimeData.dailyLimit
+          }, {
+            onConflict: 'user_id,usage_date'
+          });
+
+        // Reload data
+        await loadTodaysData();
+      }
+      
+    } catch (error) {
+      console.error('Error granting manual override:', error);
+    }
+  };
+
+  const getManualOverrideCount = (timeframe: 'today' | 'week' | 'all' = 'today') => {
+    try {
+      const manualOverrides = JSON.parse(localStorage.getItem('manual_overrides') || '[]');
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      
+      switch (timeframe) {
+        case 'today':
+          return manualOverrides.filter((override: any) => override.date === today).length;
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          return manualOverrides.filter((override: any) => override.date >= weekAgo).length;
+        case 'all':
+        default:
+          return manualOverrides.length;
+      }
+    } catch {
+      return 0;
+    }
+  };
+
   return {
     screenTimeData,
     isTracking,
@@ -429,6 +504,8 @@ export const useDeviceTracking = () => {
     loadTodaysData,
     updateAppUsage,
     updateAppLimits,
-    grantAppOverride
+    grantAppOverride,
+    grantManualOverride,
+    getManualOverrideCount
   };
 };
