@@ -19,9 +19,9 @@ serve(async (req) => {
   }
 
   try {
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY is not set');
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error('GEMINI_API_KEY is not set');
     }
 
     const { userInput, context, trainingData }: CoachRequest = await req.json();
@@ -54,31 +54,38 @@ Respond naturally as if you're having a friendly conversation. Keep it brief and
       ).join('\n\n')}`;
     }
 
-    // Call Lovable AI Gateway
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Call Gemini API with correct endpoint
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userInput }
+        contents: [
+          {
+            parts: [
+              { text: systemPrompt },
+              { text: `User message: ${userInput}` }
+            ]
+          }
         ],
-        max_tokens: 200,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 200,
+        }
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Lovable AI Gateway Error:', response.status, errorData);
-      throw new Error(`AI Gateway error: ${response.status}`);
+      console.error('Gemini API Error:', errorData);
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const generatedText = data.choices?.[0]?.message?.content || 'I understand. How can I help you with your wellness goals?';
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I understand. How can I help you with your wellness goals?';
 
     // Use AI-generated response directly without predetermined overrides
     const coachResponse = {
