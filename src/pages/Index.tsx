@@ -15,6 +15,7 @@ import PermissionExplanationDialog from "../components/PermissionExplanationDial
 import PrivacyPolicyDialog from "../components/PrivacyPolicyDialog";
 import PermissionStatusBanner from "../components/PermissionStatusBanner";
 import DataManagementDialog from "../components/DataManagementDialog";
+import { AllAppsManager } from "../components/AllAppsManager";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeviceTracking } from "@/hooks/useDeviceTracking";
 import { useInspirationMessages } from "@/hooks/useInspirationMessages";
@@ -186,6 +187,8 @@ const Index = () => {
 
   const renderContent = () => {
     switch (activeTab) {
+      case "all-apps":
+        return <AllAppsManager />;
       case "limits":
         return <AppLimitsSettings />;
       case "insights":

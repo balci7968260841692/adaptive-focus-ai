@@ -9,7 +9,8 @@ import {
   Home, 
   Brain,
   Clock,
-  Shield
+  Shield,
+  Smartphone
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -26,6 +27,12 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       label: 'Dashboard',
       icon: Home,
       description: 'Overview'
+    },
+    {
+      id: 'all-apps',
+      label: 'All Apps',
+      icon: Smartphone,
+      description: 'Scan Device'
     },
     {
       id: 'limits',
@@ -82,7 +89,7 @@ const AppNavigation = ({ activeTab, onTabChange, hasActiveOverride = false, trus
       </div>
 
       {/* Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           const Icon = item.icon;
